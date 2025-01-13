@@ -9,20 +9,23 @@
     <body class="hg">
         <header class="hg__header">{% block header %}{% endblock %}</header>
         <main class="hg__main">
-            <div class="body-content"><Br/>
+            <div class="body-content">
                 {% block content %}
                 {% endblock %}
             </div>
         </main>
         <aside class="hg__left">
             <div class="navbar"><br/>
-                <a href="{{ url_for('home') }}" class="navbar-brand">Home</a><br/>
-                <a href="{{ url_for('about') }}" class="navbar-item">About</a><br/>
+                <a href="{{ url_for('home') }}" class="navbar-brand">Home</a>
+                <a href="{{ url_for('about') }}" class="navbar-item">About</a>
                 <a href="{{ url_for('contact') }}" class="navbar-item">Contact</a><br/><br/>
             </div>
         </aside>
         <aside class="hg__right">
-            <div><br/>
+            <div class="appbar"><br/>
+                <span class=appbar-brand>Ads</span>
+                <span class=appbar-item>Number 1</span>
+                <span class=appbar-item>Number 2</span><br/></br>
             </div>
         </aside>
         <footer class="hg__footer">
