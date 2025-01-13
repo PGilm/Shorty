@@ -99,9 +99,9 @@
 		                     "footer";
 		grid-template-columns: 100%;
 		grid-template-rows: 20px
-							90px
+							55px
 							1fr
-							90px
-							30px;
+							75px
+							20px;
 	}
 }
