@@ -4,10 +4,10 @@
 }
 
 .navbar {
-    background-color: lightslategray;
+    background-color: rgb(78, 146, 137);
     font-size: 1em;
     font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
-    color: white;
+    color: rgb(11, 10, 10);
     padding: 8px 5px 8px 5px;
 }
 
@@ -19,14 +19,51 @@
 .navbar-brand {
     font-size: 1.2em;
     font-weight: 600;
+    margin-left: 3px;
 }
 
 .navbar-item {
     font-variant: small-caps;
-    margin-left: 30px;
+    margin-left: 3px;
 }
 
 .body-content {
-    padding: 5px;
+    /* padding: 5px; */
     font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin-left: 3px;
+    clear: both;
+}
+
+.hg__header { grid-area: header; }
+.hg__footer { grid-area: footer; }
+.hg__main { grid-area: main; }
+.hg__left { grid-area: navigation; }
+.hg__right { grid-area: ads; }
+
+.hg {
+	display: grid;
+	grid-template-areas: "header header header"
+	                     "navigation main ads"
+	                     "footer footer footer";
+	grid-template-columns: 100px 1fr 100px;
+	grid-template-rows: 30px
+						1fr
+						30px;
+	min-height: 30vh;
+}
+
+@media screen and (max-width: 600px) {
+	.hg {
+		grid-template-areas: "header"
+		                     "navigation"
+		                     "main"
+		                     "ads"
+		                     "footer";
+		grid-template-columns: 100%;
+		grid-template-rows: 20px
+							75px
+							1fr
+							10px
+							10px;
+	}
 }

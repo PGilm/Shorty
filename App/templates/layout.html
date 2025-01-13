@@ -6,20 +6,28 @@
         <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='site.css')}}" />
     </head>
 
-    <body>
-        <div class="navbar">
-            <a href="{{ url_for('home') }}" class="navbar-brand">Home</a>
-            <a href="{{ url_for('about') }}" class="navbar-item">About</a>
-            <a href="{{ url_for('contact') }}" class="navbar-item">Contact</a>
-        </div>
-
-        <div class="body-content">
-            {% block content %}
-            {% endblock %}
+    <body class="hg">
+        <header class="hg__header">{% block header %}{% endblock %}</header>
+        <main class="hg__main">
+            <div class="body-content"><Br/>
+                {% block content %}
+                {% endblock %}
+            </div>
+        </main>
+        <aside class="hg__left">
+            <div class="navbar"><br/>
+                <a href="{{ url_for('home') }}" class="navbar-brand">Home</a><br/>
+                <a href="{{ url_for('about') }}" class="navbar-item">About</a><br/>
+                <a href="{{ url_for('contact') }}" class="navbar-item">Contact</a><br/><br/>
+            </div>
+        </aside>
+        <aside class="hg__right">
+            <div><br/>
+            </div>
+        </aside>
+        <footer class="hg__footer">
             <hr/>
-            <footer>
-                <p>&copy; 2018</p>
-            </footer>
-        </div>
+            <p>&copy; 2025</p>
+        </footer>
     </body>
 </html>
