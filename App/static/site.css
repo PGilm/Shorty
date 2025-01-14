@@ -52,7 +52,7 @@
 }
 
 .body-content {
-	padding: 0px 5px 8px 5px;
+	padding: 0px 2px 2px 5px;
 	/* margin: 0px 0px 0px 0px; */
     font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 	background-color: rgb(129, 186, 108);
@@ -68,39 +68,42 @@
 			  background-color: rgb(17, 70, 63);
 		}
 
-.hg__footer { grid-area: footer; }
+.hg__footer { grid-area: footer; 
+			  background-color: rgb(17, 70, 63);
+}
 
 .hg__main { grid-area: main; 
 			background-color: rgb(0, 0, 0);
 			padding: 0px 5px 8px 5px;
 }
 
-.hg__left { grid-area: navigation; 
-		    background-color: rgb(0, 0, 0);
-			padding: 14px 5px 8px 5px;
+.hg__left { grid-area: nav; 
+		    background-color: rgb(62, 12, 12);
+			padding: 5px 5px 0px 5px;
 		}
 
 .hg__right { grid-area: app; 
-			 background-color: rgb(0, 0, 0);
-			 padding: 14px 5px 8px 5px;
+			 background-color: rgb(52, 9, 56);
+			 padding: 5px 5px 0px 5px;
 		}
 
 .hg {
 	display: grid;
 	grid-template-areas: "header header header"
-	                     "navigation main app"
+	                     "nav main app"
 	                     "footer footer footer";
 	grid-template-columns: 110px 1fr 110px;
 	grid-template-rows: 30px
 						1fr
 						20px;
 	min-height: 20vh;
+	background-color: rgb(255, 255, 0);
 }
 
 @media screen and (max-width: 550px) {
 	.hg {
 		grid-template-areas: "header"
-		                     "navigation"
+		                     "nav"
 		                     "main"
 		                     "app"
 		                     "footer";
@@ -108,7 +111,7 @@
 		grid-template-rows: 30px
 							45px
 							1fr
-							75px
-							20px;
+							70px
+							22px;
 	}
 }
