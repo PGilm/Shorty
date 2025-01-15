@@ -6,6 +6,10 @@ from flask import Flask, render_template
 app = Flask(__name__)
 
 # Replace the existing home function with the one below
+@app.route("/datatable/")
+def datatable():
+    return render_template("datatable.html")
+
 @app.route("/")
 def home():
     return render_template("home.html")
@@ -19,8 +23,7 @@ def about():
 def contact():
     return render_template("contact.html")
 
-
-@app.route("/api/data")
+@app.route("/api/data/")
 def get_data():
     return app.send_static_file("data.json")
 

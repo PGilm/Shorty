@@ -6,6 +6,10 @@ from . import app
 def home():
     return render_template("home.html")
 
+@app.route("/datatable/")
+def datatable():
+    return render_template("datatable.html")
+
 @app.route("/about/")
 def about():
     return render_template("about.html")
