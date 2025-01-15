@@ -52,11 +52,14 @@
 }
 
 .main {
-	padding: 5px 5px 5px 5px;
-	/* margin: 0px 0px 0px 0px; */
-    font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-	background-color: rgb(129, 186, 108);
+    padding: 0px 5px 0px 5px;
+    /* margin: 0px 0px 0px 0px; */
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: rgb(129, 186, 108);
     /* clear: both; */
+    /* display: flex;
+    flex-direction: column;
+    justify-content: flex-start; */
 }
 
 .main p {
