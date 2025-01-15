@@ -6,5 +6,9 @@ DataTable
 Shorty - DataTable View
 {% endblock %}
 {% block content %}
-    
+    {%if datatable %}
+        <span>{{ datatable }}</span>
+    {% else %}
+        <span class="message">Not working.</span>
+    {% endif %}
 {% endblock %}

@@ -6,10 +6,6 @@ from . import app
 def home():
     return render_template("home.html")
 
-@app.route("/datatable/")
-def datatable():
-    return render_template("datatable.html")
-
 @app.route("/about/")
 def about():
     return render_template("about.html")
@@ -24,7 +20,14 @@ def hello_there(name = None):
     return render_template(
         "hello_there.html",
         name=name,
-        date=datetime.now()
+        date=datetime.now(),
+    )
+
+@app.route("/datatable/")
+def datatable(datatable = None):
+    return render_template(
+        "datatable.html",
+        datatable="data.json",
     )
 
 @app.route("/api/data")
