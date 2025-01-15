@@ -32,7 +32,7 @@
     font-size: 1em;
     font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
     color: rgb(11, 10, 10);
-    padding: 5px 5px 8px 5px;
+    padding: 5px 5px 5px 5px;
 }
 
 .appbar a {
@@ -79,12 +79,12 @@
 
 .hg__left { grid-area: nav; 
 		    background-color: rgb(62, 12, 12);
-			padding: 5px 5px 0px 5px;
+			padding: 5px 5px 8px 5px;
 		}
 
 .hg__right { grid-area: app; 
 			 background-color: rgb(52, 9, 56);
-			 padding: 5px 5px 0px 5px;
+			 padding: 5px 5px 8px 5px;
 		}
 
 .hg {
@@ -109,9 +109,9 @@
 		                     "footer";
 		grid-template-columns: 100%;
 		grid-template-rows: 30px
-							45px
+							max-content
 							1fr
-							70px
+							max-content
 							22px;
 	}
 }
