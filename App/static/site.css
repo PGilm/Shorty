@@ -8,7 +8,7 @@
     font-size: 1em;
     font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
     color: rgb(0, 0, 0);
-    padding: 5px 5px 8px 5px;
+    padding: 5px 5px 5px 5px;
 }
 
 .navbar a {
@@ -51,12 +51,16 @@
     margin-left: 3px;
 }
 
-.body-content {
-	padding: 0px 2px 2px 5px;
+.main {
+	padding: 5px 5px 5px 5px;
 	/* margin: 0px 0px 0px 0px; */
     font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 	background-color: rgb(129, 186, 108);
     /* clear: both; */
+}
+
+.main p {
+    color: rgb(94, 30, 16);
 }
 
 .hg__header { grid-area: header; 
@@ -69,34 +73,35 @@
 		}
 
 .hg__footer { grid-area: footer; 
-			  background-color: rgb(17, 70, 63);
+			  background-color: rgb(73, 93, 41);
 }
 
 .hg__main { grid-area: main; 
-			background-color: rgb(0, 0, 0);
-			padding: 0px 5px 8px 5px;
+			background-color: rgb(15, 20, 91);
+			padding: 5px 5px 5px 5px;
+			margin-top: 0px;
 }
 
 .hg__left { grid-area: nav; 
 		    background-color: rgb(62, 12, 12);
-			padding: 5px 5px 8px 5px;
+			padding: 5px 5px 5px 5px;
 		}
 
 .hg__right { grid-area: app; 
 			 background-color: rgb(52, 9, 56);
-			 padding: 5px 5px 8px 5px;
+			 padding: 5px 5px 5px 5px;
 		}
 
 .hg {
 	display: grid;
 	grid-template-areas: "header header header"
-	                     "nav main app"
+	                     " nav    main   app"
 	                     "footer footer footer";
 	grid-template-columns: 110px 1fr 110px;
 	grid-template-rows: 30px
-						1fr
-						20px;
-	min-height: 20vh;
+						max-content /* 1fr */
+						22px;
+	/* min-height: 20vh; */
 	background-color: rgb(255, 255, 0);
 }
 
@@ -110,7 +115,7 @@
 		grid-template-columns: 100%;
 		grid-template-rows: 30px
 							max-content
-							1fr
+							max-content	/* 1fr */
 							max-content
 							22px;
 	}
