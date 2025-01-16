@@ -1,4 +1,4 @@
-from flask import Flask, url_for, render_template, redirect, flash
+from flask import Flask, redirect, url_for, render_template, request, flash
 from datetime import datetime, timedelta
 
 import re  # for the RegEx
@@ -12,9 +12,13 @@ def none():
     flash("Hello! This flash message because this is your first time?", "info")
     return redirect(url_for("home"))
 
-@app.route("/home/")
+@app.route("/home/", methods=["POST", "GET"])
 def home():
-    return render_template("home.html")
+    if request.method == "POST":
+        user = request.form["nm"]
+        return redirect(url_for("hello_there", name=user))
+    else:
+        return render_template("home.html")
 
 @app.route("/about/")
 def about():
