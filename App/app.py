@@ -1,17 +1,21 @@
-from flask import Flask, render_template
+from flask import Flask, url_for, render_template, redirect, flash
+from datetime import datetime, timedelta
 
-import re
-from datetime import datetime
+import re  # for the RegEx
 
 app = Flask(__name__)
+app.secret_key = "123456789"
+app.permanent_session_lifetime = timedelta(days=5)
 
-# Replace the existing home function with the one below
 @app.route("/")
+def none():
+    flash("Hello! This flash message because this is your first time?", "info")
+    return redirect(url_for("home"))
+
 @app.route("/home/")
 def home():
     return render_template("home.html")
 
-# New functions
 @app.route("/about/")
 def about():
     return render_template("about.html")
@@ -27,6 +31,7 @@ def datatable(datatable = None):
         datatable="data.json",
     )
 
+# For Demo purpose
 @app.route("/api/data/")
 def get_data():
     return app.send_static_file("data.json")
@@ -42,13 +47,12 @@ def hello_there(name = None):
 
 @app.route("/oldhello/<name>")
 def oldhello_there(name):
-    print("http://127.0.0.1:5000/hello/Philip")
     now = datetime.now()
-    # formatted_now = now.strftime("%A, %d %B, %Y at %X")
     formatted_now = now.strftime("%A, %b %d, %y at %X")
 
-    # Filter the name argument to letters only using regular expressions. URL arguments
-    # can contain arbitrary text, so we restrict to safe characters only.
+    # Filter the name argument to letters only using regular expressions. 
+    # URL arguments can contain arbitrary text, so we restrict to safe 
+    # characters only.
     match_object = re.match("[a-zA-Z]+", name)
 
     if match_object:
@@ -58,4 +62,3 @@ def oldhello_there(name):
 
     content = "Hello there, " + clean_name + "! It's " + formatted_now
     return content
-
