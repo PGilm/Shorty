@@ -1,12 +1,13 @@
+from flask import Flask, render_template
+
 import re
 from datetime import datetime
-
-from flask import Flask, render_template
 
 app = Flask(__name__)
 
 # Replace the existing home function with the one below
 @app.route("/")
+@app.route("/home/")
 def home():
     return render_template("home.html")
 
