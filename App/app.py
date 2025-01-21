@@ -5,20 +5,37 @@ import re  # for the RegEx
 
 app = Flask(__name__)
 app.secret_key = "123456789"
-app.permanent_session_lifetime = timedelta(days=5)
+app.permanent_session_lifetime = timedelta(minutes=15)
 
 @app.route("/")
 def none():
-    flash("Hello! This flash message because this is your first time?", "info")
-    return redirect(url_for("home"))
+    if "user" in session:
+            user = session["user"]
+            return render_template(
+                "home.html",
+                name = session["user"]
+            )
+    else:
+        flash("Hello! This flash message because this is your first time?", "info")
+        return redirect(url_for("login"))
 
 @app.route("/home/")
 @app.route("/home/<name>")
 def home(name = None):
-    return render_template(
-        "home.html",
-        name = session["user"]
-    )
+    if request.method == 'POST':
+        session.pop("user", None)
+        return redirect(url_for("login"))
+    # elif request.method == 'GET':
+    #     return render_template(url_for('about'))
+    #
+    if "user" in session:
+        user = session["user"]
+        return render_template(
+            "home.html",
+            name = session["user"]
+        )
+    else:
+        return redirect(url_for("login"))
 
 @app.route("/login/", methods=["POST", "GET"])
 def login():
@@ -28,6 +45,13 @@ def login():
         return redirect(url_for("home"))
     else:
         return render_template("login.html")
+
+def logout():
+    if "user" in session:
+        session.pop("user")
+        return render_template(url_for("login"))
+    else:
+        return render_template(url_for("about"))
 
 @app.route("/about/")
 def about():
