@@ -46,12 +46,13 @@ def login():
     else:
         return render_template("login.html")
 
+@app.route("/logout/")
 def logout():
     if "user" in session:
         session.pop("user")
-        return render_template(url_for("login"))
+        return redirect(url_for("login"))
     else:
-        return render_template(url_for("about"))
+        return redirect(url_for("about"))
 
 @app.route("/about/")
 def about():
