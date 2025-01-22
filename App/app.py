@@ -2,6 +2,7 @@ from flask import Flask, redirect, url_for, render_template, request, session, f
 from datetime import datetime, timedelta
 
 import re  # for the RegEx
+import pandas as pd
 
 app = Flask(__name__)
 app.secret_key = "123456789"
@@ -62,12 +63,39 @@ def about():
 def contact():
     return render_template("contact.html")
 
-@app.route("/datatable/")
-def datatable(datatable = None):
-    return render_template(
-        "datatable.html",
-        datatable="data.json"
-    )
+@app.route("/datatable/", methods=['GET', 'POST'])
+def datatable():
+    table_html = None
+    if request.method == 'POST':
+        file = request.files.get('file')
+        if file and file.filename:
+            try:
+                data = pd.read_csv(file)
+                table_html = data.to_html()
+            except Exception as e:
+                table_html = f"Error processing file: {e}"
+
+    return render_template('datatable.html', table_html=table_html)
+    # if request.method == 'POST':
+    #     # Check if the post request has the file part
+    #     if 'file' not in request.files:
+    #         return redirect(url_for("datatable"))
+    #     file = request.files['file']
+    #     if file.filename == '':
+    #         return redirect(url_for("datatable"))
+    #     if file:
+    #         data = pd.read_csv(file)
+    #         return render_template('table.html', data=data.to_html())
+    
+    # return render_template('upload.html')
+
+    # # Read data from a CSV file
+    # data = pd.read_csv('data.csv')  # Adjust the file path as needed
+    # return render_template('table.html', data=data.to_html())
+    # return render_template(
+    #     "datatable.html",
+    #     datatable="data.json"
+    # )
 
 # For Demo purpose
 @app.route("/api/data/")
@@ -100,3 +128,7 @@ def oldhello_there(name):
 
     content = "Hello there, " + clean_name + "! It's " + formatted_now
     return content
+
+if __name__ == '__main__':
+    app.run(debug=True)
+    
