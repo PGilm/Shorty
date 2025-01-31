@@ -54,7 +54,10 @@
 .main {
     padding: 5px 5px 5px 5px;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: rgb(129, 186, 108);
+    background-color: lightgreen;
+	overflow-x: auto;
+	overflow-y: auto;
+	height: 100%;
 }
 
 .main-brand {
@@ -72,18 +75,19 @@
 .hg__header { grid-area: header; 
 			  font-size: 1.2em;
 			  font-weight: 600;
-			  color: rgb(255, 255, 0);
+			  color: yellow;
 			  text-align: center;
 			  padding: 2px 0px 0px 0px;
-			  background-color: rgb(17, 70, 63);
+			  background-color: darkgreen;
 		}
 
 .hg__footer { grid-area: footer; 
-			  background-color: rgb(73, 93, 41);
+			  background-color: darkseagreen;
+			  height: fit-content;
 }
 
 .hg__main { grid-area: main; 
-			background-color: rgb(15, 20, 91);
+			background-color: darkorchid;
 			padding: 5px 5px 5px 5px;
 			margin-top: 0px;
 		}
@@ -107,7 +111,10 @@
 	grid-template-rows: 30px
 						max-content /* 1fr */
 						22px;
-	background-color: rgb(255, 255, 0);
+	background-color: orange;
+	overflow: hidden;
+	margin: 0;
+	/* height: 100vh; */
 }
 
 @media screen and (max-width: 550px) {
@@ -120,8 +127,10 @@
 		grid-template-columns: 100%;
 		grid-template-rows: 30px
 							max-content
-							max-content	/* 1fr */
+							1fr
 							max-content
 							22px;
+		overflow: hidden;
+		margin: 0;
 	}
 }
