@@ -2,6 +2,7 @@ from flask import Flask, redirect, url_for, render_template, request, session, f
 from datetime import datetime, timedelta
 
 import re  # for the RegEx
+from bs4 import BeautifulSoup
 import pandas as pd
 
 app = Flask(__name__)
@@ -50,7 +51,7 @@ def login():
 @app.route("/logout/")
 def logout():
     if "user" in session:
-        session.pop("user")
+        session.pop("user", None)
         return redirect(url_for("login"))
     else:
         return redirect(url_for("about"))
@@ -65,37 +66,26 @@ def contact():
 
 @app.route("/datatable/", methods=['GET', 'POST'])
 def datatable():
-    table_html = None
     if request.method == 'POST':
+        session.permanent = True
         file = request.files.get('file')
         if file and file.filename:
             try:
-                data = pd.read_csv(file)
-                table_html = data.to_html()
+                html_content = file.read()
+                soup = BeautifulSoup(html_content, 'html.parser')
+                table = soup.find('table')
+                if table:
+                    if "table_html" in session:
+                        session.pop("table_html", None)
+                    session.permanent = True
+                    session["table_html"] = str(table)
+                else:
+                    session["table_html"] = "No table found in the HTML file."
             except Exception as e:
-                table_html = f"Error processing file: {e}"
+                session["table_html"] = f"Error processing file: {e}"
 
+    table_html = session.get("table_html")
     return render_template('datatable.html', table_html=table_html)
-    # if request.method == 'POST':
-    #     # Check if the post request has the file part
-    #     if 'file' not in request.files:
-    #         return redirect(url_for("datatable"))
-    #     file = request.files['file']
-    #     if file.filename == '':
-    #         return redirect(url_for("datatable"))
-    #     if file:
-    #         data = pd.read_csv(file)
-    #         return render_template('table.html', data=data.to_html())
-    
-    # return render_template('upload.html')
-
-    # # Read data from a CSV file
-    # data = pd.read_csv('data.csv')  # Adjust the file path as needed
-    # return render_template('table.html', data=data.to_html())
-    # return render_template(
-    #     "datatable.html",
-    #     datatable="data.json"
-    # )
 
 # For Demo purpose
 @app.route("/api/data/")
