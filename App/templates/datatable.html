@@ -3,18 +3,23 @@
 DataTable
 {% endblock %}
 {% block header %}
-Shorty - DataTable View
+Shorty - {{ session.username }}
 {% endblock %}
 {% block content %}
-    <h1>Upload CSV File</h1>
-    <form method="post" enctype="multipart/form-data">
-        <input type="file" name="file" accept="text/html"><br><br>
-        <input type="submit" value="Upload">
-    </form>
-    <br>
-    {% if table_html %}
-        <div>{{ table_html | safe }}</div>
+    {% if session.table_html %}
+        <form method="post" enctype="multipart/form-data">
+            <input type="file" name="file" accept="text/html">
+            <input type="submit" value="Upload">
+            <span>{{ session.filename }}</span>
+        </form>
+        <div>{{ session.table_html | safe }}</div>
     {% else %}
-        <div class="message">Please upload a CSV file to display its content.</div>
+        <h2>Upload your Shorty File</h2>
+        <form method="post" enctype="multipart/form-data">
+            <input type="file" name="file" accept="text/html"><br>
+            <input type="submit" value="Upload">
+        </form>
+        <br>
+        <div class="message">Please upload a HTML file to display its content.</div>
     {% endif %}
 {% endblock %}

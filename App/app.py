@@ -1,4 +1,6 @@
 from flask import Flask, redirect, url_for, render_template, request, session, flash
+from flask_session import Session
+
 from datetime import datetime, timedelta
 
 import re  # for the RegEx
@@ -7,7 +9,13 @@ import pandas as pd
 
 app = Flask(__name__)
 app.secret_key = "123456789"
-app.permanent_session_lifetime = timedelta(minutes=15)
+
+app = Flask(__name__)
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_TYPE"] = "filesystem"
+Session(app)
+
+app.permanent_session_lifetime = timedelta(days=15)
 
 @app.route("/")
 def none():
@@ -27,9 +35,6 @@ def home(name = None):
     if request.method == 'POST':
         session.pop("user", None)
         return redirect(url_for("login"))
-    # elif request.method == 'GET':
-    #     return render_template(url_for('about'))
-    #
     if "user" in session:
         user = session["user"]
         return render_template(
@@ -52,6 +57,8 @@ def login():
 def logout():
     if "user" in session:
         session.pop("user", None)
+        if "table_html" in session:
+            session.pop("table_html", None)
         return redirect(url_for("login"))
     else:
         return redirect(url_for("about"))
@@ -65,9 +72,9 @@ def contact():
     return render_template("contact.html")
 
 @app.route("/datatable/", methods=['GET', 'POST'])
-def datatable():
+@app.route("/datatable/<table_html>")
+def datatable(table_html=None):
     if request.method == 'POST':
-        session.permanent = True
         file = request.files.get('file')
         if file and file.filename:
             try:
@@ -75,17 +82,24 @@ def datatable():
                 soup = BeautifulSoup(html_content, 'html.parser')
                 table = soup.find('table')
                 if table:
-                    if "table_html" in session:
+                    while "table_html" in session:
                         session.pop("table_html", None)
-                    session.permanent = True
                     session["table_html"] = str(table)
+                    session["filename"] = file.filename
                 else:
                     session["table_html"] = "No table found in the HTML file."
             except Exception as e:
                 session["table_html"] = f"Error processing file: {e}"
 
-    table_html = session.get("table_html")
-    return render_template('datatable.html', table_html=table_html)
+    if "table_html" in session:
+        return render_template(
+            "datatable.html",
+            table_html = session["table_html"]
+        )
+    return render_template(
+        'datatable.html',
+        table_html = None
+        )
 
 # For Demo purpose
 @app.route("/api/data/")
