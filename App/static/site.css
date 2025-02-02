@@ -55,14 +55,11 @@
     padding: 5px 5px 5px 5px;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: lightgreen;
-	/* overflow: auto; */
-	overflow: inherit ;
-	margin: 0;
 }
 
 .main-brand {
-    color:brown; 
-	font-size: 1.2em;
+    color: rgb(94, 30, 16);
+    font-size: 1.2em;
     font-weight: 600;
     margin-left: 3px;
 }
@@ -91,11 +88,10 @@
 			padding: 5px 5px 5px 5px;
 			overflow: auto;
 			overflow-x: auto;
-			/* margin: 0; */
 		}
 
 .hg__left { grid-area: nav; 
-		    background-color:darkred;
+		    background-color: rgb(62, 12, 12);
 			padding: 5px 5px 5px 5px;
 		}
 
