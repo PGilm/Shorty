@@ -133,5 +133,9 @@ def oldhello_there(name):
     return content
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(
+        debug=True,
+        # host='192.168.1.218',
+        # port=5001,
+        )
     
