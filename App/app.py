@@ -89,13 +89,13 @@ def shortytable(table_html=None):
                         copy_button.string = 'Copy'
                         new_cell.append(copy_button)
                         
-                        new_cell.append(soup.new_tag('br'))
+                        # new_cell.append(soup.new_tag('br'))
                         
                         edit_button = soup.new_tag('button', type='button', **{'class': 'btn btn-edit'})
                         edit_button.string = 'Edit'
                         new_cell.append(edit_button)
                         
-                        new_cell.append(soup.new_tag('br'))
+                        # new_cell.append(soup.new_tag('br'))
                         
                         delete_button = soup.new_tag('button', type='button', **{'class': 'btn btn-delete'})
                         delete_button.string = 'Delete'
@@ -158,7 +158,7 @@ def oldhello_there(name):
 if __name__ == '__main__':
     app.run(
         debug=True,
-        # host='192.168.1.218',
+        # host='0.0.0.0',
         # port=5001,
         )
     
