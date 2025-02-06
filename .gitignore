@@ -12,7 +12,11 @@ instance/
 .webassets-cache
 flask_session/
 
+#VS Code
+.vscode
+.vscode/
 
+# OTHER RANDOM
 .pytest_cache/
 .coverage
 htmlcov/
@@ -26,7 +30,3 @@ build/
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
-
-#VS Code
-.vscode
-.vscode/
