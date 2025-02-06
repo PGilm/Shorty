@@ -85,13 +85,13 @@ def shortytable(table_html=None):
                     for row in table.find_all('tr'):
                         new_cell = soup.new_tag('td')
                         
-                        copy_button = soup.new_tag('button', type='button', **{'class': 'btn btn-copy'})
+                        copy_button = soup.new_tag('button', type='button', id='copy-button', **{'class': 'btn btn-copy'})
                         copy_button.string = 'Copy'
                         new_cell.append(copy_button)
                         
                         # new_cell.append(soup.new_tag('br'))
                         
-                        edit_button = soup.new_tag('button', type='button', **{'class': 'btn btn-edit'})
+                        edit_button = soup.new_tag('button', type='button', id='edit-button', **{'class': 'btn btn-edit'})
                         edit_button.string = 'Edit'
                         new_cell.append(edit_button)
                         
@@ -158,7 +158,7 @@ def oldhello_there(name):
 if __name__ == '__main__':
     app.run(
         debug=True,
-        # host='0.0.0.0',
-        # port=5001,
+        host='0.0.0.0',
+        port=5001,
         )
     

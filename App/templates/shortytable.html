@@ -22,4 +22,38 @@ Shorty - {{ session.username }}
         <br>
         <div class="message">Please upload a HTML file to display its content.</div>
     {% endif %}
-{% endblock %}
+    <script>
+        document.addEventListener('click', function(event) {
+            if (event.target && event.target.id === 'copy-button') {
+                const leftCellText = event.target.closest('td').previousElementSibling.innerText;
+                navigator.clipboard.writeText(leftCellText).then(function() {
+                    alert('Cell text copied to clipboard');
+                }, function(err) {
+                    console.error('Could not copy text: ', err);
+                });
+            } else if (event.target && event.target.id === 'edit-button') {
+                const leftCell = event.target.closest('td').previousElementSibling;
+                if (event.target.innerText === 'Edit') {
+                    leftCell.contentEditable = 'true';
+                    event.target.innerText = 'Save';
+                } else {
+                    leftCell.contentEditable = 'false';
+                    event.target.innerText = 'Edit';
+                    // Save the updated HTML to disk
+                    const updatedHtml = document.querySelector('table').outerHTML;
+                    fetch('/save', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ html: updatedHtml })
+                    }).then(response => response.json()).then(data => {
+                        alert(data.message);
+                    }).catch(error => {
+                        console.error('Error saving file:', error);
+                    });
+                }
+            }
+        });
+    </script>
+    {% endblock %}
