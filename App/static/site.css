@@ -69,7 +69,7 @@
     color: rgb(70, 22, 11);
 }
 
-.btn {
+.smbtn {
     display: block;
     width: 100%;
     margin: 2px 0;
@@ -77,17 +77,17 @@
     font-size: 12px;
 }
 
-.btn-copy {
+.smbtn-copy {
     background-color: #4CAF50; /* Green */
     color: white;
 }
 
-.btn-edit {
+.smbtn-edit {
     background-color: #2196F3; /* Blue */
     color: white;
 }
 
-.btn-delete {
+.smbtn-delete {
     background-color: #f44336; /* Red */
     color: white;
 }
