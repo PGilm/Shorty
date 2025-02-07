@@ -1,4 +1,0 @@
-import flask
-from . import app
-
-app = flask.Flask(__name__)
