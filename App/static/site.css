@@ -3,6 +3,10 @@
     color: blue;
 }
 
+.ShortyTable div {
+	width:100%;
+	}
+
 .navbar {
     background-color: rgb(78, 146, 137);
     font-size: 1em;
@@ -73,8 +77,8 @@
     display: block;
     width: 100%;
     margin: 2px 0;
-    padding: 5px;
-    font-size: 12px;
+    padding: 1px;
+    font-size: 8px;
 }
 
 .smbtn-copy {
