@@ -3,10 +3,6 @@
     color: blue;
 }
 
-.ShortyTable div {
-	width:100%;
-	}
-
 .navbar {
     background-color: rgb(78, 146, 137);
     font-size: 1em;
@@ -59,7 +55,8 @@
     padding: 5px 5px 5px 5px;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: lightgreen;
-}
+	width:fit-content;
+	}
 
 .main-brand {
     color: rgb(94, 30, 16);
@@ -77,8 +74,8 @@
     display: block;
     width: 100%;
     margin: 2px 0;
-    padding: 1px;
-    font-size: 8px;
+    padding: 5px;
+    font-size: 12px;
 }
 
 .smbtn-copy {
@@ -111,10 +108,8 @@
 }
 
 .hg__main { grid-area: main; 
-			background-color: darkorchid;
-			padding: 5px 5px 5px 5px;
+	
 			overflow: auto;
-			overflow-x: auto;
 		}
 
 .hg__left { grid-area: nav; 
@@ -138,9 +133,11 @@
 						50px;
 	background-color: orange;
 	overflow: hidden;
+	overflow-y: auto;
 	margin: 0;
-	height: 100vh;
-}
+	width: 100%;
+	height: 100%;
+	}
 
 @media only screen and (max-width: 600px) {
 	.hg {
@@ -155,8 +152,10 @@
 							1fr
 							max-content
 							50px;
-		overflow: hidden;
-		margin: 0;
-		height: 100vh;
 	}
+
+	.hg__main { 
+		height: 80vh;
+	}
+
 }
