@@ -5,8 +5,8 @@ Public tag, loopMax
 Dim debg : debg=False
 Dim timerloops : timerloops=30  '  100 ~3:30
 Dim mec
-Dim prefix : prefix = ".\AutoPressPG\AutoPressPG "
-Dim prefixdt : prefixdt = ".\AutoPressPG\_DataTables\AutoPressPG "
+Dim prefix : prefix = ".\Shorty\Shorty "
+Dim prefixdt : prefixdt = ".\Shorty\_DataTables\Shorty "
 
 Sub proxyoff
      ' msgbox "ProxyOff running"
@@ -126,11 +126,11 @@ wscript.quit
 			' debg=true
 			if debg then msgbox tryit & vbCrlf _
 				& vbCRLF & "<auto> """ & mec & """" : Debg = false
-			' call AutoPressPG-button.vbs mec
+			' call Shorty-button.vbs mec
 				Dim objSCR
 				Set objSCR = CreateObject("WScript.Shell")
-				objSCR.Run (".\AutoPressPG\AutoPressPG-button.vbs " _
-					& """" & mec & " AutoPressPG """)
+				objSCR.Run (".\Shorty\Shorty-button.vbs " _
+					& """" & mec & " Shorty """)
 				Set objSCR = Nothing
 		  end if
           tryit = tryit & "<button class=smBut>" & mec & "</button>"
@@ -380,11 +380,11 @@ End Function
 Sub start_timer(timer)
      ' msgbox "Start Timer " & timer
      tag = 1  '  increment tag and begin
-     document.title = "[*] - AutoPressPG"
+     document.title = "[*] - Shorty"
 
      Do While tag>0
           tagArea.InnerHTML = tag  '  write current tag to app
-          document.title = tag & " - AutoPressPG"
+          document.title = tag & " - Shorty"
 
           mec = nowTime
           additemFull.Value = additemFull.Value & mec & vbcrlf
@@ -512,7 +512,7 @@ Sub dbut(x)  '  the DELETE button
      ' MsgBox "d " & x
      Dim rInt : rInt=Mid(x,2)-1
      ' MsgBox "d " & x & " rInt " & CStr(rInt)
-     if MsgBox("Are you quite sure you want to delete this?",vbYesNo,"AutoPressPG - Delete")=vbNo then Exit Sub
+     if MsgBox("Are you quite sure you want to delete this?",vbYesNo,"Shorty - Delete")=vbNo then Exit Sub
      document.getElementsByTagName("Table")(0).deleteRow(rInt)
      Set rInt = Nothing
      copytoHTM(datatblSel.value)
