@@ -1,0 +1,11 @@
+[
+  {
+    "short_form": "Pros",
+    "long_note": "1. Structured Data: JSON provides a clear and structured way to represent tabular data. It is easy to read, parse, and manipulate.\n2. Data Integrity: JSON ensures data integrity, making it less likely to introduce errors during updates and modifications.\n3. Separation of Content and Presentation: By storing data separately in JSON, you can focus on content management independently from its presentation in HTML.\n4. Interoperability: JSON is widely supported by various programming languages and tools, facilitating data exchange and integration."
+  },
+  {
+    "short_form": "Cons",
+    "long_note": "1. Formatting: While JSON is great for data storage, it lacks the inherent capability to store rich text formatting like HTML.\n2. Additional Parsing Required: To display JSON data as an HTML table, additional parsing and rendering logic is required, which might add complexity to your application."
+  }
+]
+

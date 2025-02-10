@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Editable Table</title>
+    <script>
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(function() {
+                alert('Copied to clipboard');
+            });
+        }
+        
+        function editRow(rowIndex) {
+            // Logic to edit the row
+        }
+
+        function deleteRow(rowIndex) {
+            // Logic to delete the row
+        }
+
+        function saveFile() {
+            fetch('/save', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => alert(data.message));
+        }
+
+        function saveAsFile() {
+            const fileName = prompt("Enter file name:");
+            if (fileName) {
+                fetch('/save-as', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ file_name: fileName })
+                })
+                .then(response => response.json())
+                .then(data => alert(data.message));
+            }
+        }
+    </script>
+</head>
+<body>
+    <table border="1">
+        <tr>
+            <th>Short Form</th>
+            <th>Long Note</th>
+            <th>Actions</th>
+        </tr>
+        {% for row in data %}
+        <tr>
+            <td>{{ row.short_form }}</td>
+            <td>{{ row.long_note | safe }}</td>
+            <td>
+                <button onclick="copyToClipboard('{{ row.long_note | safe }}')">Copy</button>
+                <button onclick="editRow({{ loop.index0 }})">Edit</button>
+                <button onclick="deleteRow({{ loop.index0 }})">Delete</button>
+                <button onclick="saveFile()">Save</button>
+                <button onclick="saveAsFile()">Save As</button>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

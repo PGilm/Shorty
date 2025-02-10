@@ -12,6 +12,7 @@ instance/
 .webassets-cache
 flask_session/
 *.bak
+.hintrc
 
 #VS Code
 .vscode
