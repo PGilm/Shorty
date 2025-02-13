@@ -130,39 +130,13 @@ def shortyjson(table_json=None):
         file = request.files.get('file')
         if file and file.filename:
             try:
-                html_content = file.read()
-                soup = BeautifulSoup(html_content, 'html.parser')
-                table = soup.find('table')
-                if table:
-                    # Add a new column with buttons to each row
-                    for row in table.find_all('tr'):
-                        new_cell = soup.new_tag('td')
-                        
-                        copy_button = soup.new_tag('button', type='button', id='copy-button', **{'class': 'smbtn smbtn-copy'})
-                        copy_button.string = 'Copy'
-                        new_cell.append(copy_button)
-                        
-                        # new_cell.append(soup.new_tag('br'))
-                        
-                        edit_button = soup.new_tag('button', type='button', id='edit-button', **{'class': 'smbtn smbtn-edit'})
-                        edit_button.string = 'Edit'
-                        new_cell.append(edit_button)
-                        
-                        # new_cell.append(soup.new_tag('br'))
-                        
-                        delete_button = soup.new_tag('button', type='button', id='delete-button', **{'class': 'smbtn smbtn-delete'})
-                        delete_button.string = 'Delete'
-                        new_cell.append(delete_button)
-                        
-                        row.append(new_cell)
-                    
-                    # Assign the modified table HTML to session
-                    while "table_json" in session:
-                        session.pop("table_json", None)
-                    session["table_json"] = str(table)
-                    session["filename"] = file.filename
-                else:
-                    session["table_json"] = "No table found in the HTML file."
+                json_content = file.read()
+                table = json_content
+                # Assign the modified table HTML to session
+                while "table_json" in session:
+                    session.pop("table_json", None)
+                session["table_json"] = str(table)
+                session["filename"] = file.filename
             except Exception as e:
                 session["table_json"] = f"Error processing file: {e}"
 
