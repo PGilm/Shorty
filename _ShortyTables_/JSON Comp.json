@@ -1,7 +1,7 @@
 [
   {
     "short_form": "Pros",
-    "long_note": "1. Structured Data: JSON provides a clear and structured way to represent tabular data. It is easy to read, parse, and manipulate.\n2. Data Integrity: JSON ensures data integrity, making it less likely to introduce errors during updates and modifications.\n3. Separation of Content and Presentation: By storing data separately in JSON, you can focus on content management independently from its presentation in HTML.\n4. Interoperability: JSON is widely supported by various programming languages and tools, facilitating data exchange and integration."
+    "long_note": "<ol><li><strong>Structured Data:</strong> JSON provides a clear and structured way to represent tabular data. It is easy to read, parse, and manipulate.</li><li><strong>Data Integrity:</strong> JSON ensures data integrity, making it less likely to introduce errors during updates and modifications.</li><li><strong>Separation of Content and Presentation:</strong> By storing data separately in JSON, you can focus on content management independently from its presentation in HTML.</li><li><strong>Interoperability:</strong> JSON is widely supported by various programming languages and tools, facilitating data exchange and integration.</li></ol>"
   },
   {
     "short_form": "Cons",

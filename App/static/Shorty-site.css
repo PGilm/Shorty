@@ -1,0 +1,161 @@
+.message {
+    font-weight: 600;
+    color: blue;
+}
+
+.navbar {
+    background-color: rgb(78, 146, 137);
+    font-size: 1em;
+    font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+    color: rgb(0, 0, 0);
+    padding: 5px 5px 5px 5px;
+}
+
+.navbar a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.navbar-brand {
+    font-size: 1.2em;
+    font-weight: 600;
+    margin-left: 3px;
+}
+
+.navbar-item {
+    font-variant: small-caps;
+    margin-left: 3px;
+}
+
+.appbar {
+    background-color: rgb(78, 146, 137);
+    font-size: 1em;
+    font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+    color: rgb(11, 10, 10);
+    padding: 5px 5px 5px 5px;
+}
+
+.appbar a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.appbar-brand {
+    font-size: 1.2em;
+    font-weight: 600;
+    margin-left: 3px;
+}
+
+.appbar-item {
+    font-variant: small-caps;
+    margin-left: 3px;
+}
+
+.main {
+    padding: 5px 5px 5px 5px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: lightgreen;
+	width:fit-content;
+	}
+
+.main-brand {
+    color: rgb(94, 30, 16);
+    font-size: 1.2em;
+    font-weight: 600;
+    margin-left: 3px;
+}
+
+.main-item {
+    margin-left: 3px;
+    color: rgb(70, 22, 11);
+}
+
+.smbtn {
+    display: block;
+    width: 100%;
+    margin: 2px 0;
+    padding: 5px;
+    font-size: 12px;
+}
+
+.smbtn-copy {
+    background-color: #4CAF50; /* Green */
+    color: white;
+}
+
+.smbtn-edit {
+    background-color: #2196F3; /* Blue */
+    color: white;
+}
+
+.smbtn-delete {
+    background-color: #f44336; /* Red */
+    color: white;
+}
+
+.hg__header { grid-area: header; 
+			  font-size: 1.2em;
+			  font-weight: 600;
+			  color: yellow;
+			  text-align: center;
+			  padding: 2px 0px 0px 0px;
+			  background-color: darkgreen;
+		}
+
+.hg__footer { grid-area: footer; 
+			  background-color: darkseagreen;
+			  height: fit-content;
+}
+
+.hg__main { grid-area: main; 
+	
+			overflow: auto;
+		}
+
+.hg__left { grid-area: nav; 
+		    background-color: rgb(62, 12, 12);
+			padding: 5px 5px 5px 5px;
+		}
+
+.hg__right { grid-area: app; 
+			 background-color: rgb(52, 9, 56);
+			 padding: 5px 5px 5px 5px;
+		}
+
+.hg {
+	display: grid;
+	grid-template-areas: "header header header"
+	                     " nav    main   app"
+	                     "footer footer footer";
+	grid-template-columns: 110px 1fr 110px;
+	grid-template-rows: 30px
+						1fr
+						50px;
+	background-color: orange;
+	overflow: hidden;
+	overflow-y: auto;
+	margin: 0;
+	width: 100%;
+	height: 100%;
+	}
+
+@media only screen and (max-width: 600px) {
+	.hg {
+		grid-template-areas: "header"
+		                     "nav"
+		                     "main"
+		                     "app"
+		                     "footer";
+		grid-template-columns: 100%;
+		grid-template-rows: 30px
+							max-content
+							1fr
+							max-content
+							50px;
+	}
+
+	.hg__main { 
+		height: 80vh;
+	}
+
+}

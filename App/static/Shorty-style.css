@@ -33,16 +33,21 @@ ol, ul {
     }
 
 table.shortytable * {
-    padding:0em;
-    margin-top:0em;
+    padding: 10em;
+    margin-top: 10em;
     margin-bottom:0em;
     width:100%;
     overflow-x: hidden;
+    border: 2px solid black;
+    }
+
+table.shortytable tr {
+    vertical-align: top;
     }
 
 table div {
-    padding:0em;
-    margin-top:0em;
+    padding:10em;
+    margin-top:10em;
     margin-bottom:0em;
     width:100%;
     overflow-x: hidden;

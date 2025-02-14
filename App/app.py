@@ -79,6 +79,9 @@ def shortytable(table_html=None):
                 soup = BeautifulSoup(html_content, 'html.parser')
                 table = soup.find('table')
                 if table:
+                    
+                    # make sure the html table class is ShortyTable 
+                    
                     # Add a new column with buttons to each row
                     for row in table.find_all('tr'):
                         new_cell = soup.new_tag('td')
@@ -131,7 +134,7 @@ def shortyjson(table_json=None):
                 json_content = file.read()
                 data = json.loads(json_content)
                 # Convert JSON data to HTML table
-                table_json = '<table>'
+                table_json = '<table class="ShortyTable">'
                 if isinstance(data, list):
                     # Assuming the JSON data is a list of dictionaries
                     headers = data[0].keys()
