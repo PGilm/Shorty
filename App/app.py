@@ -55,9 +55,7 @@ def login():
 @app.route("/logout/")
 def logout():
     if "user" in session:
-        session.pop("user", None)
-        if "table_html" in session:
-            session.pop("table_html", None)
+        session.clear()
         return redirect(url_for("login"))
     else:
         return redirect(url_for("about"))
@@ -107,7 +105,7 @@ def shortytable(table_html=None):
                     while "table_html" in session:
                         session.pop("table_html", None)
                     session["table_html"] = str(table)
-                    session["filename"] = file.filename
+                    session["filenamehtml"] = file.filename
                 else:
                     session["table_html"] = "No table found in the HTML file."
             except Exception as e:
@@ -130,15 +128,46 @@ def shortyjson(table_json=None):
         file = request.files.get('file')
         if file and file.filename:
             try:
-                with open(file.filename, 'r') as f:
-                    data = json.load(f)
+                json_content = file.read()
+                data = json.loads(json_content)
+                # Convert JSON data to HTML table
+                table_json = '<table>'
+                if isinstance(data, list):
+                    # Assuming the JSON data is a list of dictionaries
+                    headers = data[0].keys()
+                    table_json += '<thead><tr>'
+                    for header in headers:
+                        table_json += f'<th>{header}</th>'
+                    table_json += '<th>Actions</th></tr></thead><tbody>'
+                    for row in data:
+                        table_json += '<tr>'
+                        for cell in row.values():
+                            table_json += f'<td>{cell}</td>'
+                        table_json += '''
+                            <td>
+                                <button type="button" id="copy-button" class="smbtn smbtn-copy">Copy</button>
+                                <button type="button" id="edit-button" class="smbtn smbtn-edit">Edit</button>
+                                <button type="button" id="delete-button" class="smbtn smbtn-delete">Delete</button>
+                            </td>
+                        '''
+                        table_json += '</tr>'
+                    table_json += '</tbody>'
+                table_json += '</table>'
+                
                 while "table_json" in session:
                     session.pop("table_json", None)
-                session["table_json"] = str(data)
-                session["filename"] = file.filename
+                session["table_json"] = table_json
+                session["filenamejson"] = file.filename
                 return render_template('shortyjson.html', table_json=session["table_json"])
+                # with open(file.filename, 'r') as f:
+                #     data = json.load(f)
+                # while "table_json" in session:
+                #     session.pop("table_json", None)
+                # session["table_json"] = str(data)
+                # session["filename"] = file.filename
+                # return render_template('shortyjson.html', table_json=session["table_json"])
             except Exception as e:
-                session["table_json"] = f"Error processing file: {e}"
+                session["table_json"] = f"Error processing JSON file: {e}"
 
     if "table_json" in session:
         return render_template(
@@ -149,6 +178,18 @@ def shortyjson(table_json=None):
         'shortyjson.html',
         table_json = None
         )
+
+@app.route('/save', methods=['POST'])
+def save():
+    data = request.get_json()
+    updated_html = data.get('html')
+    filename = session.get('filename', 'updated_file.html')
+    try:
+        with open(filename, 'w') as file:
+            file.write(updated_html)
+        return jsonify({'message': 'File saved successfully'})
+    except Exception as e:
+        return jsonify({'message': f'Error saving file: {e}'})
 
 # For Demo purpose
 @app.route("/api/data/")
@@ -188,4 +229,3 @@ if __name__ == '__main__':
         host='0.0.0.0',
         port=5001,
         )
-    

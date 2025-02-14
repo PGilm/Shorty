@@ -10,7 +10,7 @@ Shorty - {{ session.username }}
         <form method="post" enctype="multipart/form-data">
             <input type="file" name="file" accept="text/html">
             <input type="submit" value="Upload">
-            <span>{{ session.filename }}</span>
+            <span>{{ session.filenamehtml }}</span>
         </form>
         <div>{{ session.table_html | safe }}</div>
     {% else %}

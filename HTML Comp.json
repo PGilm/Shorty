@@ -1,0 +1,13 @@
+<table><thead><tr><th>short_form</th><th>long_note</th><th>Actions</th></tr></thead><tbody><tr><td>Short form</td><td contenteditable="false">This is the <strong>FIRST</strong> l<i>ong </i>note I have!</td>
+                            <td>
+                                <button type="button" id="copy-button" class="smbtn smbtn-copy">Copy</button>
+                                <button type="button" id="edit-button" class="smbtn smbtn-edit">Edit</button>
+                                <button type="button" id="delete-button" class="smbtn smbtn-delete">Delete</button>
+                            </td>
+                        </tr><tr><td>Another short form</td><td>Here is another <em>formatted</em> long note.</td>
+                            <td>
+                                <button type="button" id="copy-button" class="smbtn smbtn-copy">Copy</button>
+                                <button type="button" id="edit-button" class="smbtn smbtn-edit">Edit</button>
+                                <button type="button" id="delete-button" class="smbtn smbtn-delete">Delete</button>
+                            </td>
+                        </tr></tbody></table>

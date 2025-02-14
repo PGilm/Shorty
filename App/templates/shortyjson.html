@@ -8,15 +8,15 @@ Shorty - {{ session.username }}
 {% block content %}
     {% if session.table_json %}
         <form method="post" enctype="multipart/form-data">
-            <input type="file" name="file" accept="text/json">
+            <input type="file" name="file" accept="application/json">
             <input type="submit" value="Upload">
-            <span>{{ session.filename }}</span>
+            <span>{{ session.filenamejson }}</span>
         </form>
         <div>{{ session.table_json | safe }}</div>
     {% else %}
-        <h2>Upload your Shorty File</h2>
+        <h2>Upload your Shorty JSON File</h2>
         <form method="post" enctype="multipart/form-data">
-            <input type="file" name="file" accept="text/json"><br>
+            <input type="file" name="file" accept="applicatiion/json"><br>
             <input type="submit" value="Upload">
         </form>
         <br>
