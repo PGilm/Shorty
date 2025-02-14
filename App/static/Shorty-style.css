@@ -32,23 +32,24 @@ ol, ul {
     margin-bottom:.2em;
     }
 
-table.shortytable * {
-    padding: 10em;
-    margin-top: 10em;
-    margin-bottom:0em;
+table.ShortyTable { 
+    padding: 0em;
+    margin-top: 0em;
+    margin-bottom: 0em;
     width:100%;
     overflow-x: hidden;
-    border: 2px solid black;
+    border: 2 black;
     }
 
-table.shortytable tr {
+table.ShortyTable tr {
     vertical-align: top;
     }
 
-table div {
-    padding:10em;
-    margin-top:10em;
-    margin-bottom:0em;
-    width:100%;
+table.ShortyTable div {
+    padding: 0em;
+    margin-top: 0em;
+    margin-bottom: 0em;
+    width: 100%;
     overflow-x: hidden;
+    background-color: lightgray
     }

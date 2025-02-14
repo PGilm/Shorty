@@ -39,7 +39,7 @@ def home(name = None):
         user = session["user"]
         return render_template(
             "home.html",
-            name = session["user"]
+            name = user
         )
     else:
         return redirect(url_for("login"))
@@ -80,9 +80,10 @@ def shortytable(table_html=None):
                 soup = BeautifulSoup(html_content, 'html.parser')
                 table = soup.find('table')
                 if table:
-                    
-                    # make sure the html table class is ShortyTable 
-                    
+                    # Check if the table has the class 'ShortyTable'
+                    if 'ShortyTable' not in table.get('class', []):
+                        # If not, set the class to 'ShortyTable'
+                        table['class'] = table.get('class', []) + ['ShortyTable']
                     # Add a new column with buttons to each row
                     for row in table.find_all('tr'):
                         new_cell = soup.new_tag('td')
@@ -135,18 +136,18 @@ def shortyjson(table_json=None):
                 json_content = file.read()
                 data = json.loads(json_content)
                 # Convert JSON data to HTML table
-                table_json = '<table class="ShortyTable">'
+                table_json = f'<table id="{file.filename}" class="ShortyTable" border="2">'
                 if isinstance(data, list):
                     # Assuming the JSON data is a list of dictionaries
                     headers = data[0].keys()
                     table_json += '<thead><tr>'
                     for header in headers:
-                        table_json += f'<th>{header}</th>'
-                    table_json += '<th>Actions</th></tr></thead><tbody>'
+                        table_json += f'<th><div>{header}</div></th>'
+                    table_json += '<th><div>Actions</div></th></tr></thead><tbody>'
                     for row in data:
                         table_json += '<tr>'
                         for cell in row.values():
-                            table_json += f'<td>{cell}</td>'
+                            table_json += f'<td><div>{cell}</div></td>'
                         table_json += '''
                             <td>
                                 <button type="button" id="copy-button" class="smbtn smbtn-copy">Copy</button>
@@ -160,16 +161,9 @@ def shortyjson(table_json=None):
                 
                 while "table_json" in session:
                     session.pop("table_json", None)
-                session["table_json"] = table_json
+                session["table_json"] = str(table_json)
                 session["filenamejson"] = file.filename
                 return render_template('shortyjson.html', table_json=session["table_json"])
-                # with open(file.filename, 'r') as f:
-                #     data = json.load(f)
-                # while "table_json" in session:
-                #     session.pop("table_json", None)
-                # session["table_json"] = str(data)
-                # session["filename"] = file.filename
-                # return render_template('shortyjson.html', table_json=session["table_json"])
             except Exception as e:
                 session["table_json"] = f"Error processing JSON file: {e}"
 
@@ -233,8 +227,10 @@ if __name__ == '__main__':
     # if platform.system() == "Linux":
     #     app.run(host='0.0.0.0', port=5001, debug=True)
     # If the system is a windows /!\ Change  /!\ the   /!\ Port
+
     app.run(
         debug=True,
-        # host='0.0.0.0',
-        # port=5001,
+        host='0.0.0.0',
+        # port=5001,  # 5001, 5002 for SBK
+        # port=5003,  # 5004 for SAG
         )

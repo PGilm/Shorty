@@ -3,7 +3,7 @@
 ShortyTable
 {% endblock %}
 {% block header %}
-Shorty - {{ session.username }}
+<span>Shorty - {{ session["user"] }}</span>
 {% endblock %}
 {% block content %}
     {% if session.table_html %}
