@@ -1,3 +1,4 @@
+import platform
 from flask import Flask, json, redirect, url_for, render_template, request, session, flash, jsonify
 from flask_session import Session
 
@@ -227,8 +228,13 @@ def oldhello_there(name):
     return content
 
 if __name__ == '__main__':
+    # Check the System Type before to decide to bind
+    # If the system is a Linux machine -:) 
+    # if platform.system() == "Linux":
+    #     app.run(host='0.0.0.0', port=5001, debug=True)
+    # If the system is a windows /!\ Change  /!\ the   /!\ Port
     app.run(
         debug=True,
-        host='0.0.0.0',
-        port=5001,
+        # host='0.0.0.0',
+        # port=5001,
         )
