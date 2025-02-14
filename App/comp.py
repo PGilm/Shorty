@@ -9,7 +9,7 @@ file_path = "C:/Users/Philip/my_data/Shorty/_ShortyTables_/HTML Comp.json"
 def index():
     with open(file_path, 'r') as file:
         data = json.load(file)
-    return render_template('index.html', data=data)
+    return render_template('comp.html', data=data)
 
 @app.route('/update', methods=['POST'])
 def update():

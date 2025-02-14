@@ -130,13 +130,13 @@ def shortyjson(table_json=None):
         file = request.files.get('file')
         if file and file.filename:
             try:
-                json_content = file.read()
-                table = json_content
-                # Assign the modified table HTML to session
+                with open(file.filename, 'r') as f:
+                    data = json.load(f)
                 while "table_json" in session:
                     session.pop("table_json", None)
-                session["table_json"] = str(table)
+                session["table_json"] = str(data)
                 session["filename"] = file.filename
+                return render_template('shortyjson.html', table_json=session["table_json"])
             except Exception as e:
                 session["table_json"] = f"Error processing file: {e}"
 
