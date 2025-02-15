@@ -5,7 +5,6 @@
   },
   {
     "short_form": "Cons",
-    "long_note": "1. Formatting: While JSON is great for data storage, it lacks the inherent capability to store rich text formatting like HTML.\n2. Additional Parsing Required: To display JSON data as an HTML table, additional parsing and rendering logic is required, which might add complexity to your application."
+    "long_note": "<ol><li><strong>Formatting:</strong> While JSON is great for data storage, it lacks the inherent capability to store rich text formatting like HTML.</li><li><strong>Additional Parsing Required</strong>: To display JSON data as an HTML table, additional parsing and rendering logic is required, which might add complexity to your application.</li></ol>"
   }
 ]
-
