@@ -6,17 +6,22 @@ click==8.1.8
 colorama==0.4.6
 Flask==3.0.3
 Flask-Session==0.8.0
+gevent==24.11.1
+greenlet==3.1.1
 gunicorn==23.0.0
 itsdangerous==2.2.0
 Jinja2==3.1.5
 MarkupSafe==2.1.5
 msgspec==0.18.6
-numpy==1.26.0  # 1.24.4 1.26.0 2.2.2
+numpy==1.26.0
 packaging==24.2
-pandas==2.0.3  # 2.2.3
+pandas==2.0.3
 python-dateutil==2.9.0.post0
 pytz==2024.2
+setuptools==75.8.0
 six==1.17.0
 soupsieve==2.6
 tzdata==2025.1
 Werkzeug==3.0.6
+zope.event==5.0
+zope.interface==7.2

@@ -7,9 +7,10 @@ from datetime import datetime, timedelta
 import re  # for the RegEx
 from bs4 import BeautifulSoup
 import pandas as pd
+import _config_  # located in .venv\lib\python3.12\site-packages
 
 app = Flask(__name__)
-app.secret_key = "123456789"
+app.secret_key = _config_.secret_key # "123456789"
 
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
