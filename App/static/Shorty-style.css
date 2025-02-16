@@ -32,7 +32,8 @@ ol, ul {
     margin-bottom:.2em;
 }
 
-table.ShortyTable, th, td { 
+table.ShortyTable { 
+    table-layout: fixed;
     padding: 0em;
     margin-top: 0em;
     margin-bottom: 0em;
@@ -51,8 +52,14 @@ table.ShortyTable thead {
     display: none;
 }
 
+table.ShortyTable td {
+    /* vertical-align: top; */
+    border: solid black 1.5px ;
+}
+
 table.ShortyTable tr {
     vertical-align: top;
+    /* border: solid black 1px ; */
 }
 
 table.ShortyTable div {
@@ -60,7 +67,25 @@ table.ShortyTable div {
     margin-top: 0em;
     margin-bottom: 0em;
     width: 100%;
-    height: 4em;
+    height: 5em;
     overflow: auto;
     background-color: lightgray
 }
+
+/* Flexbox layout for table rows */
+table.ShortyTable tr {
+    display: flex;
+}
+
+table.ShortyTable td:nth-child(1) {
+    flex: 15%;
+}
+
+table.ShortyTable td:nth-child(2) {
+    flex: 75%;
+}
+
+table.ShortyTable td:nth-child(3) {
+    flex: 10%;
+}
+
