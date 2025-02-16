@@ -41,6 +41,7 @@ table.ShortyTable, th, td {
     border: solid black 2px ;
     }
 
+    
 table.ShortyTable th div {
     color: red;
     height: 1.5em;
