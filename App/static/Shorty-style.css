@@ -53,13 +53,7 @@ table.ShortyTable thead {
 }
 
 table.ShortyTable td {
-    /* vertical-align: top; */
     border: solid black 1.5px ;
-}
-
-table.ShortyTable tr {
-    vertical-align: top;
-    /* border: solid black 1px ; */
 }
 
 table.ShortyTable div {
@@ -67,25 +61,26 @@ table.ShortyTable div {
     margin-top: 0em;
     margin-bottom: 0em;
     width: 100%;
-    height: 5em;
+    height: 4.2em;
     overflow: auto;
     background-color: lightgray
 }
 
-/* Flexbox layout for table rows */
 table.ShortyTable tr {
-    display: flex;
+    width: 100%;
+    vertical-align: top;
 }
 
 table.ShortyTable td:nth-child(1) {
-    flex: 15%;
+    width: 15%;
 }
 
 table.ShortyTable td:nth-child(2) {
-    flex: 75%;
+    width: 75%;
 }
 
 table.ShortyTable td:nth-child(3) {
-    flex: 10%;
+    width: 10%;
+    background-color: lightgray
 }
 
