@@ -32,13 +32,18 @@ ol, ul {
     margin-bottom:.2em;
     }
 
-table.ShortyTable { 
+table.ShortyTable, th, td { 
     padding: 0em;
     margin-top: 0em;
     margin-bottom: 0em;
     width:100%;
-    overflow-x: hidden;
-    border: 2 black;
+    overflow: hidden;
+    border: solid black 2px ;
+    }
+
+table.ShortyTable th div {
+    color: red;
+    height: 1.5em;
     }
 
 table.ShortyTable tr {
@@ -50,6 +55,7 @@ table.ShortyTable div {
     margin-top: 0em;
     margin-bottom: 0em;
     width: 100%;
-    overflow-x: hidden;
+    height: 4em;
+    overflow: auto;
     background-color: lightgray
     }

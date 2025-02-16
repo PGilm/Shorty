@@ -137,13 +137,13 @@ def shortyjson(table_json=None):
                 json_content = file.read()
                 data = json.loads(json_content)
                 # Convert JSON data to HTML table
-                table_json = f'<table id="{file.filename}" class="ShortyTable" border="2">'
+                table_json = f'<table id="{file.filename}" class="ShortyTable">'
                 if isinstance(data, list):
                     # Assuming the JSON data is a list of dictionaries
                     headers = data[0].keys()
                     table_json += '<thead><tr>'
                     for header in headers:
-                        table_json += f'<th><div>{header}</div></th>'
+                        table_json += f'<th><div>{header}</div></th>' 
                     table_json += '<th><div>Actions</div></th></tr></thead><tbody>'
                     for row in data:
                         table_json += '<tr>'
