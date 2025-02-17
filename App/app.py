@@ -7,7 +7,9 @@ from datetime import datetime, timedelta
 import re  # for the RegEx
 from bs4 import BeautifulSoup
 import pandas as pd
-import _config_  # located in .venv\lib\python3.12\site-packages
+
+import get_port
+import _config_  # hidden in .venv\lib\python\site-packages
 
 app = Flask(__name__)
 app.secret_key = _config_.secret_key # "123456789"
@@ -223,11 +225,5 @@ def oldhello_there(name):
     return content
 
 if __name__ == '__main__':
-    # Check the System Name and Type before to decide to bind
-    if platform.system() == "Windows":
-        if platform.node == "SBK": p = 5001
-        if platform.node == "SAG": p = 5003
-    if platform.system() == "Linux":
-        if platform.node == "SBK": p = 5002
-        if platform.node == "SAG": p = 5004
-    app.run(host='0.0.0.0', debug=True, port=p)
+    port = get_port()
+    app.run(host='0.0.0.0', debug=True, port=port)
