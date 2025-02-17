@@ -221,7 +221,7 @@ def oldhello_there(name):
     else:
         clean_name = "Friend"
 
-    content = "Hello there, " + clean_name + "! It's " + formatted_now
+    content = "Hello there, " + clean_name + "!! It's " + formatted_now
     return content
 
 if __name__ == '__main__':
