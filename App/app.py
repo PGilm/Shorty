@@ -223,15 +223,11 @@ def oldhello_there(name):
     return content
 
 if __name__ == '__main__':
-    # Check the System Type before to decide to bind
-    # If the system is a Linux machine -:) 
-    # if platform.system() == "Linux":
-    #     app.run(host='0.0.0.0', port=5001, debug=True)
-    # If the system is a windows /!\ Change  /!\ the   /!\ Port
-
-    app.run(
-        debug=True,
-        host='0.0.0.0',
-        # port=5001,  # 5001, 5002 for SBK
-        # port=5003,  # 5003, 5004 for SAG
-        )
+    # Check the System Name and Type before to decide to bind
+    if platform.system() == "Windows":
+        if platform.node == "SBK": p = 5001
+        if platform.node == "SAG": p = 5003
+    if platform.system() == "Linux":
+        if platform.node == "SBK": p = 5002
+        if platform.node == "SAG": p = 5004
+    app.run(host='0.0.0.0', debug=True, port=p)
