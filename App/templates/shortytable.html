@@ -56,7 +56,7 @@ ShortyTable
             }
         });
 
-        $(document).ready(function(){
+        {% comment %} $(document).ready(function(){
            $("html").css({"background-color":"green",
                  "margin-top":"0em", "margin-left":"0em",
                  "margin-right":"0em", "margin-bottom":"0em",
@@ -76,7 +76,7 @@ ShortyTable
             //debg = true;
             if (debg) {alert("JAVA SCRIPT fired");};
             //debg = false;
-        });
+        }); {% endcomment %}
     
     </script>
 {% endblock %}

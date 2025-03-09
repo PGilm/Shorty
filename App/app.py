@@ -1,4 +1,3 @@
-import platform
 from flask import Flask, json, redirect, url_for, render_template, request, session, flash, jsonify
 from flask_session import Session
 
@@ -7,7 +6,9 @@ from datetime import datetime, timedelta
 import re  # for the RegEx
 from bs4 import BeautifulSoup
 import pandas as pd
-import _config_  # located in .venv\lib\python3.12\site-packages
+
+import App.static.shortyFunc as sf
+import _config_  # hidden in .venv\lib\python\site-packages
 
 app = Flask(__name__)
 app.secret_key = _config_.secret_key # "123456789"
@@ -74,48 +75,7 @@ def contact():
 @app.route("/shortytable/<table_html>")
 def shortytable(table_html=None):
     if request.method == 'POST':
-        file = request.files.get('file')
-        if file and file.filename:
-            try:
-                html_content = file.read()
-                soup = BeautifulSoup(html_content, 'html.parser')
-                table = soup.find('table')
-                if table:
-                    # Check if the table has the class 'ShortyTable'
-                    if 'ShortyTable' not in table.get('class', []):
-                        # If not, set the class to 'ShortyTable'
-                        table['class'] = table.get('class', []) + ['ShortyTable']
-                    # Add a new column with buttons to each row
-                    for row in table.find_all('tr'):
-                        new_cell = soup.new_tag('td')
-                        
-                        copy_button = soup.new_tag('button', type='button', id='copy-button', **{'class': 'smbtn smbtn-copy'})
-                        copy_button.string = 'Copy'
-                        new_cell.append(copy_button)
-                        
-                        # new_cell.append(soup.new_tag('br'))
-                        
-                        edit_button = soup.new_tag('button', type='button', id='edit-button', **{'class': 'smbtn smbtn-edit'})
-                        edit_button.string = 'Edit'
-                        new_cell.append(edit_button)
-                        
-                        # new_cell.append(soup.new_tag('br'))
-                        
-                        delete_button = soup.new_tag('button', type='button', id='delete-button', **{'class': 'smbtn smbtn-delete'})
-                        delete_button.string = 'Delete'
-                        new_cell.append(delete_button)
-                        
-                        row.append(new_cell)
-                    
-                    # Assign the modified table HTML to session
-                    while "table_html" in session:
-                        session.pop("table_html", None)
-                    session["table_html"] = str(table)
-                    session["filenamehtml"] = file.filename
-                else:
-                    session["table_html"] = "No table found in the HTML file."
-            except Exception as e:
-                session["table_html"] = f"Error processing file: {e}"
+        sf.get_ShortyTable()
 
     if "table_html" in session:
         return render_template(
@@ -131,42 +91,7 @@ def shortytable(table_html=None):
 @app.route("/shortyjson/<table_json>")
 def shortyjson(table_json=None):
     if request.method == 'POST':
-        file = request.files.get('file')
-        if file and file.filename:
-            try:
-                json_content = file.read()
-                data = json.loads(json_content)
-                # Convert JSON data to HTML table
-                table_json = f'<table id="{file.filename}" class="ShortyTable">'
-                if isinstance(data, list):
-                    # Assuming the JSON data is a list of dictionaries
-                    headers = data[0].keys()
-                    table_json += '<thead><tr>'
-                    for header in headers:
-                        table_json += f'<th><div>{header}</div></th>' 
-                    table_json += '<th><div>Actions</div></th></tr></thead><tbody>'
-                    for row in data:
-                        table_json += '<tr>'
-                        for cell in row.values():
-                            table_json += f'<td><div>{cell}</div></td>'
-                        table_json += '''
-                            <td>
-                                <button type="button" id="copy-button" class="smbtn smbtn-copy">Copy</button>
-                                <button type="button" id="edit-button" class="smbtn smbtn-edit">Edit</button>
-                                <button type="button" id="delete-button" class="smbtn smbtn-delete">Delete</button>
-                            </td>
-                        '''
-                        table_json += '</tr>'
-                    table_json += '</tbody>'
-                table_json += '</table>'
-                
-                while "table_json" in session:
-                    session.pop("table_json", None)
-                session["table_json"] = str(table_json)
-                session["filenamejson"] = file.filename
-                return render_template('shortyjson.html', table_json=session["table_json"])
-            except Exception as e:
-                session["table_json"] = f"Error processing JSON file: {e}"
+        sf.get_ShortyJson()
 
     if "table_json" in session:
         return render_template(
@@ -219,19 +144,9 @@ def oldhello_there(name):
     else:
         clean_name = "Friend"
 
-    content = "Hello there, " + clean_name + "! It's " + formatted_now
+    content = "Hello there, " + clean_name + "!! It's " + formatted_now
     return content
 
 if __name__ == '__main__':
-    # Check the System Type before to decide to bind
-    # If the system is a Linux machine -:) 
-    # if platform.system() == "Linux":
-    #     app.run(host='0.0.0.0', port=5001, debug=True)
-    # If the system is a windows /!\ Change  /!\ the   /!\ Port
-
-    app.run(
-        debug=True,
-        host='0.0.0.0',
-        # port=5001,  # 5001, 5002 for SBK
-        # port=5003,  # 5004 for SAG
-        )
+    port = sf.get_port()
+    app.run(host='0.0.0.0', debug=True, port=port)

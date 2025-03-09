@@ -70,30 +70,6 @@
     color: rgb(70, 22, 11);
 }
 
-.smbtn {
-    display: block;
-    width: 100%;
-    margin: 2px 0;
-    padding: 2px;
-    font-size: 10px;
-	height: 32%;
-}
-
-.smbtn-copy {
-    background-color: #4CAF50; /* Green */
-    color: white;
-}
-
-.smbtn-edit {
-    background-color: #2196F3; /* Blue */
-    color: white;
-}
-
-.smbtn-delete {
-    background-color: #f44336; /* Red */
-    color: white;
-}
-
 .hg__header { grid-area: header; 
 			  font-size: 1.2em;
 			  font-weight: 600;
