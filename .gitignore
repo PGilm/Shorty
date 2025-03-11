@@ -9,6 +9,7 @@ __pycache__/
 
 # Flask specific
 instance/
+migrations/
 .webassets-cache
 flask_session/
 *.bak

@@ -11,7 +11,7 @@ import App.static.shortyFunc as sf
 import _config_  # hidden in .venv\lib\python\site-packages
 
 app = Flask(__name__)
-app.secret_key = _config_.secret_key # "123456789"
+app.secret_key = _config_.SECRET_KEY # "123456789"
 
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
