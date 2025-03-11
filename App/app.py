@@ -7,7 +7,7 @@ import re  # for the RegEx
 from bs4 import BeautifulSoup
 import pandas as pd
 
-import App.static.shortyFunc as sf
+import static.shortyFunc as sf
 import _config_  # hidden in .venv\lib\python\site-packages
 
 app = Flask(__name__)
