@@ -7,7 +7,7 @@ import re  # for the RegEx
 from bs4 import BeautifulSoup
 import pandas as pd
 
-import static.shortyFunc as sf
+from App.static import shortyFunc as sf
 import _config_  # hidden in .venv\lib\python\site-packages
 
 app = Flask(__name__)
@@ -19,7 +19,7 @@ Session(app)
 
 app.permanent_session_lifetime = timedelta(days=15)
 
-@app.route("/")
+@app.route("/") # base or no route renders user-home or new-login 
 def none():
     if "user" in session:
             user = session["user"]
@@ -35,13 +35,13 @@ def none():
 @app.route("/home/<name>")
 def home(name = None):
     if request.method == 'POST':
-        session.pop("user", None)
+        session.clear # pop("user", None)
         return redirect(url_for("login"))
     if "user" in session:
-        user = session["user"]
+        # user = session["user"]
         return render_template(
             "home.html",
-            name = user
+            name = session["user"] # user
         )
     else:
         return redirect(url_for("login"))
@@ -145,6 +145,7 @@ def oldhello_there(name):
         clean_name = "Friend"
 
     content = "Hello there, " + clean_name + "!! It's " + formatted_now
+    # "http://127.0.0.1:5000/hello/VSCode"
     return content
 
 if __name__ == '__main__':

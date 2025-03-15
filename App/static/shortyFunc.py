@@ -1,5 +1,5 @@
 import platform
-import app as a
+from App import app as a
 
 def get_ShortyJson() -> str:
     file = a.request.files.get('file')
