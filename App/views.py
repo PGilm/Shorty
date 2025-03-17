@@ -3,6 +3,8 @@ from flask_session import Session
 
 from datetime import datetime, timedelta
 
+from . import app # refact
+
 import re  # for the RegEx
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -14,7 +16,7 @@ except:
 
 import _config_  # hidden in .venv\lib\python\site-packages
 
-app = Flask(__name__)
+# app = Flask(__name__) # refact
 app.secret_key = _config_.SECRET_KEY # "123456789"
 
 app.config["SESSION_PERMANENT"] = False
