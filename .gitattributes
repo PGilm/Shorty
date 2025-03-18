@@ -3,4 +3,4 @@
 * text=auto eol=lf
 *.{cmd,[cC][mM][dD]} text eol=crlf
 *.{bat,[bB][aA][tT]} text eol=crlf
-*.{ps1,[pP][sS]1l}   text eol=crlf
+*.{ps1,[pP][sS][1l]} text eol=crlf

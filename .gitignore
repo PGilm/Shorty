@@ -14,7 +14,7 @@ migrations/
 flask_session/
 *.bak
 .hintrc
-.env
+# .env
 
 #VS Code
 .vscode
