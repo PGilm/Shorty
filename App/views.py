@@ -9,15 +9,11 @@ import re  # for the RegEx
 from bs4 import BeautifulSoup
 import pandas as pd
 
-try:
-    from static import shortyFunc as sf
-except:
-    from App.static import shortyFunc as sf
+from App.static import shortyFunc as sf
 
 # import _config_  # hidden in .venv\lib\python\site-packages
 
-# app = Flask(__name__) # refact
-app.secret_key = "123456789123456789" # _config_.SECRET_KEY # "123456789"
+app.secret_key = _config_.SECRET_KEY # "123456789"
 
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"

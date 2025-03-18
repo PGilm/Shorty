@@ -1,9 +1,6 @@
 import platform
 
-try:
-    import App.views as a
-except:
-    from App import app as a
+import App.views as a
 
 def get_ShortyJson() -> str:
     file = a.request.files.get('file')
