@@ -1,6 +1,6 @@
 import platform
 
-import App.views as a
+import App.core.views as a
 
 def get_ShortyJson() -> str:
     file = a.request.files.get('file')
