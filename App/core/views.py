@@ -16,9 +16,9 @@ import pandas as pd
 
 from App.static import shortyFunc as sf
 
-import _config_  # hidden in .venv\lib\python\site-packages
+# import _config_  # hidden in .venv\lib\python\site-packages
 
-app.secret_key = _config_.SECRET_KEY # "123456789"
+app.secret_key = 123456789123456789  # _config_.SECRET_KEY # "123456789"
 
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
@@ -27,15 +27,10 @@ Session(app)
 app.permanent_session_lifetime = timedelta(days=15)
 
 
-# @core_bp.route("/")
-# def home():
-#     return render_template("core/index.html")
-
 @core_bp.route("/") # base or no route renders user-home or new-login 
-@login_required
+# @login_required
 def none():
     if "user" in session:
-            user = session["user"]
             return render_template(
                 "core/home.html",
                 name = session["user"]
@@ -46,35 +41,29 @@ def none():
 
 @core_bp.route("/home/")
 @core_bp.route("/home/<name>")
+@login_required
 def home(name = None):
-    if request.method == 'POST':
-        session.clear # pop("user", None)
-        return redirect(url_for("accounts.login"))
-    if "user" in session:
-        # user = session["user"]
-        return render_template(
-            "core/home.html",
-            name = session["user"] # user
-        )
-    else:
-        return redirect(url_for("accounts.login"))
+    return render_template(
+        "core/home.html",
+        name = name # session["user"] # user
+    )
 
-@core_bp.route("/login/", methods=["POST", "GET"])
-def login():
-    if request.method == "POST":
-        session.permanent = True
-        session["user"] = request.form["nm"]
-        return redirect(url_for("core.home"))
-    else:
-        return render_template("accounts/login.html")
+# @core_bp.route("/login/", methods=["POST", "GET"])
+# def login():
+#     if request.method == "POST":
+#         session.permanent = True
+#         session["user"] = request.form["nm"]
+#         return redirect(url_for("core.home"))
+#     else:
+#         return render_template("accounts/login.html")
 
-@core_bp.route("/logout/")
-def logout():
-    if "user" in session:
-        session.clear()
-        return redirect(url_for("accounts.login"))
-    else:
-        return redirect(url_for("core.about"))
+# @core_bp.route("/logout/")
+# def logout():
+#     if "user" in session:
+#         session.clear()
+#         return redirect(url_for("accounts.login"))
+#     else:
+#         return redirect(url_for("core.about"))
 
 @core_bp.route("/about/")
 def about():

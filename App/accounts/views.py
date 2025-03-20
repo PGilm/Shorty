@@ -3,7 +3,7 @@ from .forms import LoginForm, RegisterForm, TwoFactorForm
 from App.accounts.models import User
 from App import db, bcrypt
 from flask_login import current_user, login_required, login_user, logout_user
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, url_for, session
 
 accounts_bp = Blueprint("accounts", __name__)
 
@@ -71,6 +71,7 @@ def login():
 @accounts_bp.route("/logout")
 @login_required
 def logout():
+    session.clear
     logout_user()
     flash("You were logged out.", "success")
     return redirect(url_for("accounts.login"))
@@ -93,12 +94,16 @@ def verify_two_factor_auth():
         if current_user.is_otp_valid(form.otp.data):
             if current_user.is_two_factor_authentication_enabled:
                 flash("2FA verification successful. You are logged in!", "success")
+                session.permanent = True
+                session["user"] = current_user.username
                 return redirect(url_for(HOME_URL))
             else:
                 try:
                     current_user.is_two_factor_authentication_enabled = True
                     db.session.commit()
                     flash("2FA setup successful. You are logged in!", "success")
+                    session.permanent = True
+                    session["user"] = current_user.username
                     return redirect(url_for(HOME_URL))
                 except Exception:
                     db.session.rollback()
