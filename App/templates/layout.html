@@ -47,7 +47,7 @@
         </main>
         <aside class="hg__left">
             <div class="navbar">
-                <a href="{{ url_for('core.home') }}" class="navbar-brand">Home</a>
+                <a href="{{ url_for('core.home', name=current_user.username) }}" class="navbar-brand">Home</a>
                 <a href="{{ url_for('core.shortytable') }}" class="navbar-item">ShortyTable</a>
                 <a href="{{ url_for('core.shortyjson') }}" class="navbar-item">ShortyJSON</a>
                 <a href="{{ url_for('core.about') }}" class="navbar-item">About</a>

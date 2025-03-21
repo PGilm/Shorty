@@ -45,7 +45,7 @@ def login():
     if current_user.is_authenticated:
         if current_user.is_two_factor_authentication_enabled:
             flash("You are already logged in.", "info")
-            return redirect(url_for(HOME_URL))
+            return redirect(url_for(HOME_URL, name=current_user.username))
         else:
             flash(
                 "You have not enabled 2-Factor Authentication. Please enable first to login.", "info")
@@ -96,7 +96,7 @@ def verify_two_factor_auth():
                 flash("2FA verification successful. You are logged in!", "success")
                 session.permanent = True
                 session["user"] = current_user.username
-                return redirect(url_for(HOME_URL))
+                return redirect(url_for(HOME_URL, name=current_user.username))
             else:
                 try:
                     current_user.is_two_factor_authentication_enabled = True
@@ -104,7 +104,7 @@ def verify_two_factor_auth():
                     flash("2FA setup successful. You are logged in!", "success")
                     session.permanent = True
                     session["user"] = current_user.username
-                    return redirect(url_for(HOME_URL))
+                    return redirect(url_for(HOME_URL, name=current_user.username))
                 except Exception:
                     db.session.rollback()
                     flash("2FA setup failed. Please try again.", "danger")

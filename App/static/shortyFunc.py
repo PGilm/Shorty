@@ -36,7 +36,7 @@ def get_ShortyJson() -> str:
                 a.session.pop("table_json", None)
             a.session["table_json"] = str(table_json)
             a.session["filenamejson"] = file.filename
-            return a.render_template('shortyjson.html', table_json=a.session["table_json"])
+            return a.render_template('core/shortyjson.html', table_json=a.session["table_json"])
         except Exception as e:
             a.session["table_json"] = f"Error processing JSON file: {e}"
     return a.session["table_json"]
@@ -80,7 +80,7 @@ def get_ShortyTable() -> str:
                     a.session.pop("table_html", None)
                 a.session["table_html"] = str(table)
                 a.session["filenamehtml"] = file.filename
-                return a.render_template('shortytable.html', table_html=a.session["table_html"])
+                return a.render_template('core/shortytable.html', table_html=a.session["table_html"])
             else:
                 a.session["table_html"] = "No table found in the HTML file."
         except Exception as e:

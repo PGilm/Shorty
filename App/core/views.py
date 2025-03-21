@@ -1,9 +1,6 @@
 from flask import Flask, json, redirect, url_for, render_template, request, session, flash, Blueprint, jsonify
-
 from flask_login import login_required
-
 from flask_session import Session
-
 from datetime import datetime, timedelta
 
 core_bp = Blueprint("core", __name__)
@@ -48,23 +45,6 @@ def home(name = None):
         name = name # session["user"] # user
     )
 
-# @core_bp.route("/login/", methods=["POST", "GET"])
-# def login():
-#     if request.method == "POST":
-#         session.permanent = True
-#         session["user"] = request.form["nm"]
-#         return redirect(url_for("core.home"))
-#     else:
-#         return render_template("accounts/login.html")
-
-# @core_bp.route("/logout/")
-# def logout():
-#     if "user" in session:
-#         session.clear()
-#         return redirect(url_for("accounts.login"))
-#     else:
-#         return redirect(url_for("core.about"))
-
 @core_bp.route("/about/")
 def about():
     return render_template("core/about.html")
@@ -75,6 +55,7 @@ def contact():
 
 @core_bp.route("/shortytable/", methods=['GET', 'POST'])
 @core_bp.route("/shortytable/<table_html>")
+@login_required
 def shortytable(table_html=None):
     if request.method == 'POST':
         sf.get_ShortyTable()
@@ -91,6 +72,7 @@ def shortytable(table_html=None):
 
 @core_bp.route("/shortyjson/", methods=['GET', 'POST'])
 @core_bp.route("/shortyjson/<table_json>")
+@login_required
 def shortyjson(table_json=None):
     if request.method == 'POST':
         sf.get_ShortyJson()
