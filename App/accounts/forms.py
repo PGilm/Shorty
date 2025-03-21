@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, EmailField # email
+from wtforms import StringField, PasswordField, EmailField, BooleanField # email
 from wtforms.validators import DataRequired, EqualTo, Length, InputRequired, Email # email
 
 from App.accounts.models import User
@@ -44,3 +44,4 @@ class LoginForm(FlaskForm):
 class TwoFactorForm(FlaskForm):
     otp = StringField('Enter OTP', validators=[
                       InputRequired(), Length(min=6, max=6)])
+    twofa = BooleanField('Save device?', default=False, )
