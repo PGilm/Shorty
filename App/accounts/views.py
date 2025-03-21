@@ -17,7 +17,7 @@ def register():
     if current_user.is_authenticated:
         if current_user.is_two_factor_authentication_enabled:
             flash("You are already registered.", "info")
-            return redirect(url_for(HOME_URL))
+            return redirect(url_for(HOME_URL, name=current_user.username))
         else:
             flash(
                 "You have not enabled 2-Factor Authentication. Please enable first to login.", "info")
@@ -71,7 +71,7 @@ def login():
 @accounts_bp.route("/logout")
 @login_required
 def logout():
-    session.clear
+    session.clear()
     logout_user()
     flash("You were logged out.", "success")
     return redirect(url_for("accounts.login"))

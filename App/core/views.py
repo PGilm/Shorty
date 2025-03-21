@@ -13,16 +13,6 @@ import pandas as pd
 
 from App.static import shortyFunc as sf
 
-# import _config_  # hidden in .venv\lib\python\site-packages
-
-app.secret_key = 123456789123456789  # _config_.SECRET_KEY # "123456789"
-
-app.config["SESSION_PERMANENT"] = False
-app.config["SESSION_TYPE"] = "filesystem"
-Session(app)
-
-app.permanent_session_lifetime = timedelta(days=15)
-
 
 @core_bp.route("/") # base or no route renders user-home or new-login 
 # @login_required
