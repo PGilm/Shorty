@@ -60,6 +60,10 @@ def login():
                 flash(
                     "You have not enabled 2-Factor Authentication. Please enable first to login.", "info")
                 return redirect(url_for(SETUP_2FA_URL))
+
+            if session["twoFA"] == True:
+                return redirect(url_for(HOME_URL, name=current_user.username))
+            
             return redirect(url_for(VERIFY_2FA_URL))
         elif not user:
             flash("You are not registered. Please register.", "danger")
@@ -96,6 +100,9 @@ def verify_two_factor_auth():
                 flash("2FA verification successful. You are logged in!", "success")
                 session.permanent = True
                 session["user"] = current_user.username
+                if form.twoFA.data == 1 or form.twoFA.data == True:
+                    flash("104 Previously accepted this device", "success")
+                    session["twoFA"] = True
                 return redirect(url_for(HOME_URL, name=current_user.username))
             else:
                 try:
@@ -104,6 +111,9 @@ def verify_two_factor_auth():
                     flash("2FA setup successful. You are logged in!", "success")
                     session.permanent = True
                     session["user"] = current_user.username
+                    if form.twoFA.data == True or form.twoFA.data == 1:
+                        flash("115 Previously accepted this device", "success")
+                        session["twoFA"] = True
                     return redirect(url_for(HOME_URL, name=current_user.username))
                 except Exception:
                     db.session.rollback()

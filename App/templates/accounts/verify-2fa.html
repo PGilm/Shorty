@@ -27,6 +27,10 @@ Two Factor Authentication Verification - Shorty
               {% endfor %}
             {% endif %}
         </div>
+        <div class="form-check mb-3">
+          {{ form.twoFA(class="form-check-input") }}
+          {{ form.twoFA.label(class="form-check-label") }}
+        </div>
         <button class="w-100 btn btn-lg btn-primary" type="submit">Verify</button>
       </form>
     </main>
