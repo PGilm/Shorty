@@ -61,9 +61,9 @@ def login():
                     "You have not enabled 2-Factor Authentication. Please enable first to login.", "info")
                 return redirect(url_for(SETUP_2FA_URL))
 
-            # if db.session.get("device_saved") != "None":
-            #     flash("Previously accepted this device", "success")
-            #     return redirect(url_for(HOME_URL, name=current_user.username))
+            if not current_user.device_saved == "None":
+                flash("You previously saved this device", "success")
+                return redirect(url_for(HOME_URL, name=current_user.username))
             
             return redirect(url_for(VERIFY_2FA_URL))
         elif not user:
@@ -76,7 +76,7 @@ def login():
 @accounts_bp.route("/logout")
 @login_required
 def logout():
-    session.clear()
+    # session.clear()
     while session.get("user", None):
         session.pop("user", None)
     logout_user()
@@ -115,8 +115,8 @@ def verify_two_factor_auth():
                     session.permanent = True
                     session["user"] = current_user.username
                     if form.twoFA.data is True or form.twoFA.data == 1:
-                        flash("You have saved this device", "success")
-                        # db.session.add("device_saved") = "Yes"
+                        flash("You have successfully saved this device", "success")
+                        current_user.device_saved = "Yes"
                     return redirect(url_for(HOME_URL, name=current_user.username))
                 except Exception:
                     db.session.rollback()
