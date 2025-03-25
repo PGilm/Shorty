@@ -14,6 +14,7 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String, unique=True, nullable=False)
     emailaddress = db.Column(db.String, nullable=False) # email
     password = db.Column(db.String, nullable=False)
+    device_saved =  db.Column(db.String, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False)
     is_two_factor_authentication_enabled = db.Column(
         db.Boolean, nullable=False, default=False)
@@ -23,6 +24,7 @@ class User(UserMixin, db.Model):
         self.username = username
         self.emailaddress = emailaddress # email
         self.password = bcrypt.generate_password_hash(password)
+        self.device_saved = "None"
         self.created_at = datetime.now()
         self.secret_token = pyotp.random_base32()
 

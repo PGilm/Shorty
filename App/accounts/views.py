@@ -61,8 +61,9 @@ def login():
                     "You have not enabled 2-Factor Authentication. Please enable first to login.", "info")
                 return redirect(url_for(SETUP_2FA_URL))
 
-            if session["twoFA"] == True:
-                return redirect(url_for(HOME_URL, name=current_user.username))
+            # if db.session.get("device_saved") != "None":
+            #     flash("Previously accepted this device", "success")
+            #     return redirect(url_for(HOME_URL, name=current_user.username))
             
             return redirect(url_for(VERIFY_2FA_URL))
         elif not user:
@@ -76,6 +77,8 @@ def login():
 @login_required
 def logout():
     session.clear()
+    while session.get("user", None):
+        session.pop("user", None)
     logout_user()
     flash("You were logged out.", "success")
     return redirect(url_for("accounts.login"))
@@ -100,9 +103,9 @@ def verify_two_factor_auth():
                 flash("2FA verification successful. You are logged in!", "success")
                 session.permanent = True
                 session["user"] = current_user.username
-                if form.twoFA.data == 1 or form.twoFA.data == True:
-                    flash("104 Previously accepted this device", "success")
-                    session["twoFA"] = True
+                if form.twoFA.data == 1 or form.twoFA.data is True:
+                    flash("You previously saved this device", "success")
+                #     db.session.add("device_saved") = "Yes"
                 return redirect(url_for(HOME_URL, name=current_user.username))
             else:
                 try:
@@ -111,9 +114,9 @@ def verify_two_factor_auth():
                     flash("2FA setup successful. You are logged in!", "success")
                     session.permanent = True
                     session["user"] = current_user.username
-                    if form.twoFA.data == True or form.twoFA.data == 1:
-                        flash("115 Previously accepted this device", "success")
-                        session["twoFA"] = True
+                    if form.twoFA.data is True or form.twoFA.data == 1:
+                        flash("You have saved this device", "success")
+                        # db.session.add("device_saved") = "Yes"
                     return redirect(url_for(HOME_URL, name=current_user.username))
                 except Exception:
                     db.session.rollback()

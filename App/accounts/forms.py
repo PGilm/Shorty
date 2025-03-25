@@ -44,4 +44,4 @@ class LoginForm(FlaskForm):
 class TwoFactorForm(FlaskForm):
     otp = StringField('Enter OTP', validators=[
                       InputRequired(), Length(min=6, max=6)])
-    twoFA = BooleanField('Save this device?', default=False, )
+    twoFA = BooleanField('Save this device?', default=False)
