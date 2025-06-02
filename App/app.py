@@ -1,6 +1,9 @@
 from flask import Flask, json, redirect, url_for, render_template, request, session, flash, jsonify
 from flask_session import Session
 
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, login_user, current_user, login_required
+
 from datetime import datetime, timedelta
 
 import re  # for the RegEx
@@ -18,6 +21,19 @@ app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
 app.permanent_session_lifetime = timedelta(days=15)
+
+app.config['SECRET_KEY'] = _config_.secret_key
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+
+db = SQLAlchemy()
+db.init_app(app)
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return sf.User.query.get(int(user_id))
 
 @app.route("/")
 def none():
@@ -46,14 +62,54 @@ def home(name = None):
     else:
         return redirect(url_for("login"))
 
-@app.route("/login/", methods=["POST", "GET"])
-def login():
+@app.route("/login-old/", methods=["POST", "GET"])
+def loginold():
     if request.method == "POST":
         session.permanent = True
         session["user"] = request.form["nm"]
         return redirect(url_for("home"))
     else:
-        return render_template("login.html")
+        return render_template("loginold.html")
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        user = sf.User.query.filter_by(username=username).first()
+        if user and sf.check_password_hash(user.password, password):
+            login_user(user)
+            session.permanent = True
+            session["user"] = user
+            return redirect(url_for('twofaverify'))
+        else:
+            flash('Invalid username or password.', 'danger')
+    return render_template('login.html')
+
+@app.route('/twofasetup', methods=['GET', 'POST'])
+@login_required
+def setup_2fa():
+    if request.method == 'POST':
+        secret = sf.generate_2fa_secret()
+        current_user.two_factor_secret = secret
+        db.session.commit()
+        sf.generate_qr_code(secret, current_user.username)
+        flash('Scan the QR code with your authenticator app.', 'info')
+        return redirect(url_for('twofaverify'))
+    return render_template('twofasetup.html')
+
+@app.route('/twofaverify', methods=['GET', 'POST'])
+@login_required
+def verify_2fa():
+    if request.method == 'POST':
+        otp = request.form.get('otp')
+        totp = sf.pyotp.TOTP(current_user.two_factor_secret)
+        if totp.verify(otp):
+            flash('2FA setup complete.', 'success')
+            return redirect(url_for('home'))
+        else:
+            flash('Invalid OTP. Please try again.', 'danger')
+    return render_template('twofaverify.html')
 
 @app.route("/logout/")
 def logout():
@@ -73,6 +129,7 @@ def contact():
 
 @app.route("/shortytable/", methods=['GET', 'POST'])
 @app.route("/shortytable/<table_html>")
+@login_required
 def shortytable(table_html=None):
     if request.method == 'POST':
         sf.get_ShortyTable()
@@ -89,6 +146,7 @@ def shortytable(table_html=None):
 
 @app.route("/shortyjson/", methods=['GET', 'POST'])
 @app.route("/shortyjson/<table_json>")
+@login_required
 def shortyjson(table_json=None):
     if request.method == 'POST':
         sf.get_ShortyJson()
@@ -104,6 +162,7 @@ def shortyjson(table_json=None):
         )
 
 @app.route('/save', methods=['POST'])
+@login_required
 def save():
     data = request.get_json()
     updated_html = data.get('html')
