@@ -1,8 +1,9 @@
 import platform
-# from flask_sqlalchemy import SQLAlchemy
-from flask_login import UserMixin
 
-import app as a
+try:
+    import app as a
+except:
+    from App import app as a
 
 import pyotp
 import qrcode

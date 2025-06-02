@@ -1,6 +1,6 @@
 # Environments
 .venv/
-.venv*/
+.?env*/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -9,10 +9,12 @@ __pycache__/
 
 # Flask specific
 instance/
+migrations/
 .webassets-cache
 flask_session/
 *.bak
 .hintrc
+.env
 
 #VS Code
 .vscode

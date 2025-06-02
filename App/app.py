@@ -10,11 +10,15 @@ import re  # for the RegEx
 from bs4 import BeautifulSoup
 import pandas as pd
 
-import App.static.shortyFunc as sf
+try:
+    from static import shortyFunc as sf
+except:
+    from App.static import shortyFunc as sf
+
 import _config_  # hidden in .venv\lib\python\site-packages
 
 app = Flask(__name__)
-app.secret_key = _config_.secret_key # "123456789"
+app.secret_key = _config_.SECRET_KEY # "123456789"
 
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
@@ -22,20 +26,7 @@ Session(app)
 
 app.permanent_session_lifetime = timedelta(days=15)
 
-app.config['SECRET_KEY'] = _config_.secret_key
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
-
-db = SQLAlchemy()
-db.init_app(app)
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-
-@login_manager.user_loader
-def load_user(user_id):
-    return sf.User.query.get(int(user_id))
-
-@app.route("/")
+@app.route("/") # base or no route renders user-home or new-login 
 def none():
     if "user" in session:
             user = session["user"]
@@ -51,13 +42,13 @@ def none():
 @app.route("/home/<name>")
 def home(name = None):
     if request.method == 'POST':
-        session.pop("user", None)
+        session.clear # pop("user", None)
         return redirect(url_for("login"))
     if "user" in session:
-        user = session["user"]
+        # user = session["user"]
         return render_template(
             "home.html",
-            name = user
+            name = session["user"] # user
         )
     else:
         return redirect(url_for("login"))
@@ -204,6 +195,7 @@ def oldhello_there(name):
         clean_name = "Friend"
 
     content = "Hello there, " + clean_name + "!! It's " + formatted_now
+    # "http://127.0.0.1:5000/hello/VSCode"
     return content
 
 if __name__ == '__main__':
