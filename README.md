@@ -2,8 +2,12 @@
 
 A flask application
 
-How to Run the Completed App for the First Time
-Now that our application is ready, you can ﬁrst migrate the database, and then run the app. To initialize the database (create a migration repository), use the command:
+https://www.freecodecamp.org/news/how-to-implement-two-factor-authentication-in-your-flask-app/
+
+pip install Flask Flask-Login Flask-Bcrypt Flask-WTF FLask-Migrate Flask-SQLAlchemy pyotp qrcode python-decouple
+
+
+How to Run the Completed App for the First Time, use the command:
 
     flask db init
 
@@ -18,3 +22,7 @@ To apply the migrations, use the command:
 To run the application, use the command:
 
     python manage.py run
+
+
+gunicorn -b 0.0.0.0:5004 -w 4 -k gevent 'app:app'
+
