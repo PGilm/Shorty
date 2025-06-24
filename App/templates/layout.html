@@ -3,6 +3,14 @@
     <head>
         <meta charset="utf-8" />
         <title>{% block title %}{% endblock %}</title>
+
+        <meta name="description" content="">
+        <meta name="author" content="">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <!-- styles -->
+        <!-- CSS only -->
+        {% block css %}{% endblock %}
+
         <link rel="stylesheet" type="text/css" 
             href="{{ url_for('static', filename='Shorty-site.css')}}" />
         <link rel="stylesheet" type="text/css" 
@@ -28,20 +36,22 @@
                     {% if messages %}
                         {% for msg in messages %}
                             <p>{{msg}}</p>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                         {% endfor %}
                     {% endif %}
                 {% endwith %}
+                <!-- child template -->
                 {% block content %}
                 {% endblock %}
             </div>
         </main>
         <aside class="hg__left">
             <div class="navbar">
-                <a href="{{ url_for('home') }}" class="navbar-brand">Home</a>
-                <a href="{{ url_for('shortytable') }}" class="navbar-item">ShortyTable</a>
-                <a href="{{ url_for('shortyjson') }}" class="navbar-item">ShortyJSON</a>
-                <a href="{{ url_for('about') }}" class="navbar-item">About</a>
-                <a href="{{ url_for('contact') }}" class="navbar-item">Contact</a><br/>
+                <a href="{{ url_for('core.home', name=current_user.username) }}" class="navbar-brand">Home</a>
+                <a href="{{ url_for('core.shortytable') }}" class="navbar-item">ShortyTable</a>
+                <a href="{{ url_for('core.shortyjson') }}" class="navbar-item">ShortyJSON</a>
+                <a href="{{ url_for('core.about') }}" class="navbar-item">About</a>
+                <a href="{{ url_for('core.contact') }}" class="navbar-item">Contact</a><br/>
             </div>
         </aside>
         <aside class="hg__right">
@@ -61,5 +71,8 @@
             <hr/>
             <p>&copy; 2025</p>
         </footer>
+
+    <!-- scripts -->
+    {% block js %}{% endblock %}
     </body>
 </html>

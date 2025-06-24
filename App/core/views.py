@@ -1,113 +1,83 @@
-from flask import Flask, json, redirect, url_for, render_template, request, session, flash, jsonify
+from flask import Flask, json, redirect, url_for, render_template, request, session, flash, Blueprint, jsonify
+from flask_login import login_required
 from flask_session import Session
-
 from datetime import datetime, timedelta
+
+core_bp = Blueprint("core", __name__)
+
+from .. import app # refact
 
 import re  # for the RegEx
 from bs4 import BeautifulSoup
 import pandas as pd
 
-try:
-    from static import shortyFunc as sf
-except:
-    from App.static import shortyFunc as sf
+from App.static import shortyFunc as sf
 
-import _config_  # hidden in .venv\lib\python\site-packages
 
-app = Flask(__name__)
-app.secret_key = _config_.SECRET_KEY # "123456789"
-
-app.config["SESSION_PERMANENT"] = False
-app.config["SESSION_TYPE"] = "filesystem"
-Session(app)
-
-app.permanent_session_lifetime = timedelta(days=15)
-
-@app.route("/") # base or no route renders user-home or new-login 
+@core_bp.route("/") # base or no route renders user-home or new-login 
+# @login_required
 def none():
     if "user" in session:
-            user = session["user"]
             return render_template(
-                "home.html",
+                "core/home.html",
                 name = session["user"]
             )
     else:
         flash("Hello! This flash message because this is your first time?", "info")
-        return redirect(url_for("login"))
+        return redirect(url_for("accounts.login"))
 
-@app.route("/home/")
-@app.route("/home/<name>")
+@core_bp.route("/home/")
+@core_bp.route("/home/<name>")
+@login_required
 def home(name = None):
-    if request.method == 'POST':
-        session.clear # pop("user", None)
-        return redirect(url_for("login"))
-    if "user" in session:
-        # user = session["user"]
-        return render_template(
-            "home.html",
-            name = session["user"] # user
-        )
-    else:
-        return redirect(url_for("login"))
+    return render_template(
+        "core/home.html",
+        name = name # session["user"] # user
+    )
 
-@app.route("/login/", methods=["POST", "GET"])
-def login():
-    if request.method == "POST":
-        session.permanent = True
-        session["user"] = request.form["nm"]
-        return redirect(url_for("home"))
-    else:
-        return render_template("login.html")
-
-@app.route("/logout/")
-def logout():
-    if "user" in session:
-        session.clear()
-        return redirect(url_for("login"))
-    else:
-        return redirect(url_for("about"))
-
-@app.route("/about/")
+@core_bp.route("/about/")
 def about():
-    return render_template("about.html")
+    return render_template("core/about.html")
 
-@app.route("/contact/")
+@core_bp.route("/contact/")
 def contact():
-    return render_template("contact.html")
+    return render_template("core/contact.html")
 
-@app.route("/shortytable/", methods=['GET', 'POST'])
-@app.route("/shortytable/<table_html>")
+@core_bp.route("/shortytable/", methods=['GET', 'POST'])
+@core_bp.route("/shortytable/<table_html>")
+@login_required
 def shortytable(table_html=None):
     if request.method == 'POST':
         sf.get_ShortyTable()
 
     if "table_html" in session:
         return render_template(
-            "shortytable.html",
+            "core/shortytable.html",
             table_html = session["table_html"]
         )
     return render_template(
-        'shortytable.html',
+        'core/shortytable.html',
         table_html = None
         )
 
-@app.route("/shortyjson/", methods=['GET', 'POST'])
-@app.route("/shortyjson/<table_json>")
+@core_bp.route("/shortyjson/", methods=['GET', 'POST'])
+@core_bp.route("/shortyjson/<table_json>")
+@login_required
 def shortyjson(table_json=None):
     if request.method == 'POST':
         sf.get_ShortyJson()
 
     if "table_json" in session:
         return render_template(
-            "shortyjson.html",
+            "core/shortyjson.html",
             table_json = session["table_json"]
         )
     return render_template(
-        'shortyjson.html',
+        'core/shortyjson.html',
         table_json = None
         )
 
-@app.route('/save', methods=['POST'])
+@core_bp.route('/save', methods=['POST'])
 def save():
     data = request.get_json()
     updated_html = data.get('html')
@@ -120,20 +90,20 @@ def save():
         return jsonify({'message': f'Error saving file: {e}'})
 
 # For Demo purpose
-@app.route("/api/data/")
+@core_bp.route("/api/data/")
 def get_data():
     return app.send_static_file("data.json")
 
-@app.route("/hello/")
-@app.route("/hello/<name>")
+@core_bp.route("/hello/")
+@core_bp.route("/hello/<name>")
 def hello_there(name = None):
     return render_template(
-        "hello_there.html",
+        "core/hello_there.html",
         name=name,
         date=datetime.now()
     )
 
-@app.route("/oldhello/<name>")
+@core_bp.route("/oldhello/<name>")
 def oldhello_there(name):
     now = datetime.now()
     formatted_now = now.strftime("%A, %b %d, %y at %X")

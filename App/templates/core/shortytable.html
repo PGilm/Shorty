@@ -1,0 +1,82 @@
+{% extends "layout.html" %}
+{% block title %}
+ShortyTable
+{% endblock %}
+{% block header %}
+<span>Shorty - {{ session["user"] }}</span>
+{% endblock %}
+{% block content %}
+    {% if session.table_html %}
+        <form method="post" enctype="multipart/form-data">
+            <input type="file" name="file" accept="text/html">
+            <input type="submit" value="Upload">
+            <span>{{ session.filenamehtml }}</span>
+        </form>
+        <div>{{ session.table_html | safe }}</div>
+    {% else %}
+        <h2>Upload your Shorty File</h2>
+        <form method="post" enctype="multipart/form-data">
+            <input type="file" name="file" accept="text/html"><br>
+            <input type="submit" value="Upload">
+        </form>
+        <br>
+        <div class="message">Please upload a HTML file to display its content.</div>
+    {% endif %}
+    <script>
+        document.addEventListener('click', function(event) {
+            if (event.target && event.target.id === 'copy-button') {
+                const leftCellText = event.target.closest('td').previousElementSibling.innerText;
+                navigator.clipboard.writeText(leftCellText).then(function() {
+                    alert('Cell text copied to clipboard');
+                }, function(err) {
+                    console.error('Could not copy text: ', err);
+                });
+            } else if (event.target && event.target.id === 'edit-button') {
+                const leftCell = event.target.closest('td').previousElementSibling;
+                if (event.target.innerText === 'Edit') {
+                    leftCell.contentEditable = 'true';
+                    event.target.innerText = 'Save';
+                } else {
+                    leftCell.contentEditable = 'false';
+                    event.target.innerText = 'Edit';
+                    // Save the updated HTML to disk
+                    const updatedHtml = document.querySelector('table').outerHTML;
+                    fetch('/save', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ html: updatedHtml })
+                    }).then(response => response.json()).then(data => {
+                        alert(data.message);
+                    }).catch(error => {
+                        console.error('Error saving file:', error);
+                    });
+                }
+            }
+        });
+
+        $(document).ready(function(){
+           $("html").css({"background-color":"green",
+                 "margin-top":"0em", "margin-left":"0em",
+                 "margin-right":"0em", "margin-bottom":"0em",
+                 "padding":"0em", "padding-right":"0em",
+                 "overflow":"hidden",
+                 "overflow-x":"hidden",
+                 "width":"100%",
+                 "height":"100%"});
+       
+            $("body").css({"background-color":"lightgreen",
+                 "margin-top":".1em", "margin-left":".1em",
+                 "margin-right":"1em", "margin-bottom":".1em",
+                 "padding":"0.1em",
+                 "width":"100%",
+                 "height":"100%"});
+       
+            //debg = true;
+            if (debg) {alert("JAVA SCRIPT fired");};
+            //debg = false;
+        });
+    
+    </script>
+{% endblock %}

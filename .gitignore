@@ -10,15 +10,15 @@ __pycache__/
 # Flask specific
 instance/
 migrations/
-.webassets-cache
 flask_session/
+.webassets-cache
 *.bak
 .hintrc
 .env
 
 #VS Code
-.vscode
-.vscode/
+#.vscode
+#.vscode/
 
 # OTHER RANDOM
 .pytest_cache/
