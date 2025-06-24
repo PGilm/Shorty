@@ -1,6 +1,10 @@
 from flask import Flask, json, redirect, url_for, render_template, request, session, flash, Blueprint, jsonify
 from flask_login import login_required
 from flask_session import Session
+
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, login_user, current_user, login_required
+
 from datetime import datetime, timedelta
 
 core_bp = Blueprint("core", __name__)
@@ -30,10 +34,66 @@ def none():
 @core_bp.route("/home/<name>")
 @login_required
 def home(name = None):
-    return render_template(
-        "core/home.html",
-        name = name # session["user"] # user
-    )
+    if request.method == 'POST':
+        session.clear # pop("user", None)
+        return redirect(url_for("login"))
+    if "user" in session:
+        # user = session["user"]
+        return render_template(
+            "home.html",
+            name = session["user"] # user
+        )
+    else:
+        return redirect(url_for("login"))
+
+@app.route("/login-old/", methods=["POST", "GET"])
+def loginold():
+    if request.method == "POST":
+        session.permanent = True
+        session["user"] = request.form["nm"]
+        return redirect(url_for("home"))
+    else:
+        return render_template("loginold.html")
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        user = sf.User.query.filter_by(username=username).first()
+        if user and sf.check_password_hash(user.password, password):
+            login_user(user)
+            session.permanent = True
+            session["user"] = user
+            return redirect(url_for('twofaverify'))
+        else:
+            flash('Invalid username or password.', 'danger')
+    return render_template('login.html')
+
+@app.route('/twofasetup', methods=['GET', 'POST'])
+@login_required
+def setup_2fa():
+    if request.method == 'POST':
+        secret = sf.generate_2fa_secret()
+        current_user.two_factor_secret = secret
+        db.session.commit()
+        sf.generate_qr_code(secret, current_user.username)
+        flash('Scan the QR code with your authenticator app.', 'info')
+        return redirect(url_for('twofaverify'))
+    return render_template('twofasetup.html')
+
+@app.route('/twofaverify', methods=['GET', 'POST'])
+@login_required
+def verify_2fa():
+    if request.method == 'POST':
+        otp = request.form.get('otp')
+        totp = sf.pyotp.TOTP(current_user.two_factor_secret)
+        if totp.verify(otp):
+            flash('2FA setup complete.', 'success')
+            return redirect(url_for('home'))
+        else:
+            flash('Invalid OTP. Please try again.', 'danger')
+    return render_template('twofaverify.html')
 
 @core_bp.route("/about/")
 def about():
@@ -43,8 +103,8 @@ def about():
 def contact():
     return render_template("core/contact.html")
 
-@core_bp.route("/shortytable/", methods=['GET', 'POST'])
-@core_bp.route("/shortytable/<table_html>")
+@app.route("/shortytable/", methods=['GET', 'POST'])
+@app.route("/shortytable/<table_html>")
 @login_required
 def shortytable(table_html=None):
     if request.method == 'POST':
@@ -60,8 +120,8 @@ def shortytable(table_html=None):
         table_html = None
         )
 
-@core_bp.route("/shortyjson/", methods=['GET', 'POST'])
-@core_bp.route("/shortyjson/<table_json>")
+@app.route("/shortyjson/", methods=['GET', 'POST'])
+@app.route("/shortyjson/<table_json>")
 @login_required
 def shortyjson(table_json=None):
     if request.method == 'POST':
@@ -77,7 +137,8 @@ def shortyjson(table_json=None):
         table_json = None
         )
 
-@core_bp.route('/save', methods=['POST'])
+@app.route('/save', methods=['POST'])
+@login_required
 def save():
     data = request.get_json()
     updated_html = data.get('html')

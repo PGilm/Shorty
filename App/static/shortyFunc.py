@@ -2,6 +2,24 @@ import platform
 
 import App.core.views as a
 
+import pyotp
+import qrcode
+
+def generate_2fa_secret():
+    return pyotp.random_base32()
+
+def generate_qr_code(secret, username):
+    otp_uri = pyotp.totp.TOTP(secret).provisioning_uri(name=username, issuer_name="YourAppName")
+    img = qrcode.make(otp_uri)
+    img.save(f"{username}_qrcode.png")
+
+# db = SQLAlchemy()
+class User(UserMixin, db.Model):
+    id = a.db.Column(a.db.Integer, primary_key=True)
+    username = a.db.Column(a.db.String(150), unique=True, nullable=False)
+    password = a.db.Column(a.db.String(150), nullable=False)
+    two_factor_secret = a.db.Column(a.db.String(16))
+
 def get_ShortyJson() -> str:
     file = a.request.files.get('file')
     if file and file.filename:
@@ -60,22 +78,17 @@ def get_ShortyTable() -> str:
                     copy_button = soup.new_tag('button', type='button', id='copy-button', **{'class': 'smbtn smbtn-copy'})
                     copy_button.string = 'Copy'
                     new_cell.append(copy_button)
-                        
-                        # new_cell.append(soup.new_tag('br'))
-                        
+                    # new_cell.append(soup.new_tag('br'))
                     edit_button = soup.new_tag('button', type='button', id='edit-button', **{'class': 'smbtn smbtn-edit'})
                     edit_button.string = 'Edit'
                     new_cell.append(edit_button)
-                        
-                        # new_cell.append(soup.new_tag('br'))
-                        
+                    # new_cell.append(soup.new_tag('br'))
                     delete_button = soup.new_tag('button', type='button', id='delete-button', **{'class': 'smbtn smbtn-delete'})
                     delete_button.string = 'Delete'
                     new_cell.append(delete_button)
                         
                     row.append(new_cell)
-                    
-                    # Assign the modified table HTML to session
+                # Assign the modified table HTML to session
                 while "table_html" in a.session:
                     a.session.pop("table_html", None)
                 a.session["table_html"] = str(table)

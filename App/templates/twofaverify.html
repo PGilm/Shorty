@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% block title %}
+Login
+{% endblock %}
+{% block header %}
+Shorty - Log In Page
+{% endblock %}
+{% block content %}
+<h2>Verify Two-Factor Authentication</h2>
+<form action="{{ url_for('verify_2fa') }}" method="POST">
+    <div class="form-group">
+        <label for="otp">One-Time Password (OTP):</label>
+        <input type="text" id="otp" name="otp" required>
+    </div>
+    <button type="submit">Verify</button>
+</form>
+{% endblock %}
