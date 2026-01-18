@@ -16,6 +16,8 @@ from bs4 import BeautifulSoup
 import pandas as pd
 
 from App.static import shortyFunc as sf
+from App.accounts.models import User
+from App import bcrypt, db
 
 
 @core_bp.route("/") # base or no route renders user-home or new-login 
@@ -40,7 +42,7 @@ def home(name = None):
     if "user" in session:
         # user = session["user"]
         return render_template(
-            "home.html",
+            "core/home.html",
             name = session["user"] # user
         )
     else:
@@ -60,15 +62,15 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        user = sf.User.query.filter_by(username=username).first()
-        if user and sf.check_password_hash(user.password, password):
+        user = User.query.filter_by(username=username).first()
+        if user and bcrypt.check_password_hash(user.password, password):
             login_user(user)
             session.permanent = True
             session["user"] = user
             return redirect(url_for('twofaverify'))
         else:
             flash('Invalid username or password.', 'danger')
-    return render_template('login.html')
+    return render_template('accounts/login.html')
 
 @app.route('/twofasetup', methods=['GET', 'POST'])
 @login_required
@@ -87,7 +89,7 @@ def setup_2fa():
 def verify_2fa():
     if request.method == 'POST':
         otp = request.form.get('otp')
-        totp = sf.pyotp.TOTP(current_user.two_factor_secret)
+        totp = sf.pyotp.TOTP(current_user.secret_token)
         if totp.verify(otp):
             flash('2FA setup complete.', 'success')
             return redirect(url_for('home'))

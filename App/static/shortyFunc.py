@@ -14,11 +14,11 @@ def generate_qr_code(secret, username):
     img.save(f"{username}_qrcode.png")
 
 # db = SQLAlchemy()
-class User(UserMixin, db.Model):
-    id = a.db.Column(a.db.Integer, primary_key=True)
-    username = a.db.Column(a.db.String(150), unique=True, nullable=False)
-    password = a.db.Column(a.db.String(150), nullable=False)
-    two_factor_secret = a.db.Column(a.db.String(16))
+# class User(UserMixin, a.db.Model):
+#     id = a.db.Column(a.db.Integer, primary_key=True)
+#     username = a.db.Column(a.db.String(150), unique=True, nullable=False)
+#     password = a.db.Column(a.db.String(150), nullable=False)
+#     two_factor_secret = a.db.Column(a.db.String(16))
 
 def get_ShortyJson() -> str:
     file = a.request.files.get('file')
