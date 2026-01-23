@@ -7,22 +7,69 @@ ShortyTable
 {% endblock %}
 {% block content %}
     {% if session.table_html %}
-        <form method="post" enctype="multipart/form-data">
-            <input type="file" name="file" accept="text/html">
-            <input type="submit" value="Upload">
+        <form method="post" enctype="multipart/form-data" action="/shortytable/">
+            <select id="tableSelect" name="filename">
+                <option value="">Select a table...</option>
+            </select>
+            <input type="submit" value="Load">
             <span>{{ session.filenamehtml }}</span>
         </form>
         <div>{{ session.table_html | safe }}</div>
     {% else %}
-        <h2>Upload your Shorty File</h2>
-        <form method="post" enctype="multipart/form-data">
-            <input type="file" name="file" accept="text/html"><br>
-            <input type="submit" value="Upload">
+        <h2>Select your Shorty Table</h2>
+        <form method="post" enctype="multipart/form-data" action="/shortytable/">
+            <select id="tableSelect" name="filename">
+                <option value="">Select a table...</option>
+            </select>
+            <input type="submit" value="Load">
         </form>
         <br>
-        <div class="message">Please upload a HTML file to display its content.</div>
+        <div class="message">Please select a HTML table file to display its content.</div>
     {% endif %}
     <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentFilename = "{{ session.filenamehtml }}";
+            const tableSelect = document.getElementById('tableSelect');
+
+            // Populate the select
+            fetch('/list_tables').then(response => response.json()).then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else if (Array.isArray(data)) {
+                    data.forEach(f => {
+                        const option = document.createElement('option');
+                        option.value = f;
+                        option.text = f;
+                        tableSelect.appendChild(option);
+                    });
+                    // Set selected if current
+                    if (currentFilename) {
+                        const basename = currentFilename.split('/').pop();
+                        tableSelect.value = basename;
+                    }
+                }
+            }).catch(error => {
+                alert('Error loading table list: ' + error);
+            });
+
+            // Auto-load last table if no current
+            if (!currentFilename) {
+                const lastTable = localStorage.getItem('lastTableFilename');
+                if (lastTable) {
+                    tableSelect.value = lastTable;
+                    tableSelect.form.submit();
+                }
+            }
+
+            // Handle change
+            tableSelect.addEventListener('change', function() {
+                if (this.value) {
+                    localStorage.setItem('lastTableFilename', this.value);
+                    this.form.submit();
+                }
+            });
+        });
+
         document.addEventListener('click', function(event) {
             if (event.target && event.target.id === 'copy-button') {
                 const leftCellText = event.target.closest('td').previousElementSibling.innerText;
@@ -39,8 +86,32 @@ ShortyTable
                 } else {
                     leftCell.contentEditable = 'false';
                     event.target.innerText = 'Edit';
-                    // Save the updated HTML to disk
-                    const updatedHtml = document.querySelector('table').outerHTML;
+                    // Prepare the updated HTML, removing actions column
+                    const table = document.querySelector('table');
+                    const clonedTable = table.cloneNode(true);
+                    // Remove actions from thead
+                    const thead = clonedTable.querySelector('thead');
+                    if (thead) {
+                        const headerRows = thead.querySelectorAll('tr');
+                        headerRows.forEach(row => {
+                            const cells = row.querySelectorAll('th, td');
+                            if (cells.length > 0) {
+                                row.removeChild(cells[cells.length - 1]);
+                            }
+                        });
+                    }
+                    // Remove from tbody
+                    const tbody = clonedTable.querySelector('tbody');
+                    if (tbody) {
+                        const rows = tbody.querySelectorAll('tr');
+                        rows.forEach(row => {
+                            const cells = row.querySelectorAll('td');
+                            if (cells.length > 0) {
+                                row.removeChild(cells[cells.length - 1]);
+                            }
+                        });
+                    }
+                    const updatedHtml = clonedTable.outerHTML;
                     fetch('/save', {
                         method: 'POST',
                         headers: {
@@ -49,6 +120,9 @@ ShortyTable
                         body: JSON.stringify({ html: updatedHtml })
                     }).then(response => response.json()).then(data => {
                         alert(data.message);
+                        if (data.table_html) {
+                            document.querySelector('table').outerHTML = data.table_html;
+                        }
                     }).catch(error => {
                         console.error('Error saving file:', error);
                     });

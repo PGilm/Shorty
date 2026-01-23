@@ -6,6 +6,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, current_user, login_required
 
 from datetime import datetime, timedelta
+import os
+from bs4 import BeautifulSoup
 
 core_bp = Blueprint("core", __name__)
 
@@ -110,7 +112,41 @@ def contact():
 @login_required
 def shortytable(table_html=None):
     if request.method == 'POST':
-        sf.get_ShortyTable()
+        filename = request.form.get('filename')
+        if filename:
+            # load from file
+            path = '/Users/pg/proj/Shorty/-ShortyTables/' + filename
+            try:
+                with open(path, 'r') as f:
+                    html_content = f.read()
+                soup = BeautifulSoup(html_content, 'html.parser')
+                table = soup.find('table')
+                if table:
+                    if 'ShortyTable' not in table.get('class', []):
+                        table['class'] = table.get('class', []) + ['ShortyTable']
+                    for row in table.find_all('tr'):
+                        new_cell = soup.new_tag('td')
+                        copy_button = soup.new_tag('button', type='button', id='copy-button', **{'class': 'smbtn smbtn-copy'})
+                        copy_button.string = 'Copy'
+                        new_cell.append(copy_button)
+                        edit_button = soup.new_tag('button', type='button', id='edit-button', **{'class': 'smbtn smbtn-edit'})
+                        edit_button.string = 'Edit'
+                        new_cell.append(edit_button)
+                        delete_button = soup.new_tag('button', type='button', id='delete-button', **{'class': 'smbtn smbtn-delete'})
+                        delete_button.string = 'Delete'
+                        new_cell.append(delete_button)
+                        row.append(new_cell)
+                    session["table_html"] = str(table)
+                    session["filenamehtml"] = path
+                    return render_template('core/shortytable.html', table_html=session["table_html"])
+                else:
+                    session["table_html"] = "No table found in the HTML file."
+                    return render_template('core/shortytable.html', table_html=None)
+            except Exception as e:
+                session["table_html"] = f"Error loading file: {e}"
+                return render_template('core/shortytable.html', table_html=None)
+        else:
+            sf.get_ShortyTable()
 
     if "table_html" in session:
         return render_template(
@@ -144,11 +180,38 @@ def shortyjson(table_json=None):
 def save():
     data = request.get_json()
     updated_html = data.get('html')
-    filename = session.get('filename', 'updated_file.html')
+    path = data.get('path')
+    if path:
+        filename = path
+        session['filenamehtml'] = path
+    else:
+        filename = session.get('filenamehtml', 'updated_file.html')
     try:
         with open(filename, 'w') as file:
             file.write(updated_html)
-        return jsonify({'message': 'File saved successfully'})
+        # Process the updated HTML to add actions and update session
+        soup = BeautifulSoup(updated_html, 'html.parser')
+        table = soup.find('table')
+        if table:
+            if 'ShortyTable' not in table.get('class', []):
+                table['class'] = table.get('class', []) + ['ShortyTable']
+            for row in table.find_all('tr'):
+                new_cell = soup.new_tag('td')
+                copy_button = soup.new_tag('button', type='button', id='copy-button', **{'class': 'smbtn smbtn-copy'})
+                copy_button.string = 'Copy'
+                new_cell.append(copy_button)
+                edit_button = soup.new_tag('button', type='button', id='edit-button', **{'class': 'smbtn smbtn-edit'})
+                edit_button.string = 'Edit'
+                new_cell.append(edit_button)
+                delete_button = soup.new_tag('button', type='button', id='delete-button', **{'class': 'smbtn smbtn-delete'})
+                delete_button.string = 'Delete'
+                new_cell.append(delete_button)
+                row.append(new_cell)
+            updated_table_html = str(table)
+            session["table_html"] = updated_table_html
+            return jsonify({'message': 'File saved successfully', 'table_html': updated_table_html})
+        else:
+            return jsonify({'message': 'File saved successfully'})
     except Exception as e:
         return jsonify({'message': f'Error saving file: {e}'})
 

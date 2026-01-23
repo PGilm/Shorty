@@ -36,6 +36,17 @@ from App.core.views import core_bp
 app.register_blueprint(accounts_bp)
 app.register_blueprint(core_bp)
 
+@app.route('/list_tables')
+def list_tables():
+    from flask import jsonify
+    import os
+    folder = '/Users/pg/proj/Shorty/-ShortyTables'
+    try:
+        files = [f for f in os.listdir(folder) if f.endswith('.html')]
+        return jsonify(files)
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
 from App.accounts.models import User
 
 @login_manager.user_loader
