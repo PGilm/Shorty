@@ -47,6 +47,17 @@ def list_tables():
     except Exception as e:
         return jsonify({'error': str(e)})
 
+@app.route('/list_json')
+def list_json():
+    from flask import jsonify
+    import os
+    folder = '/Users/pg/proj/Shorty/-ShortyTables'
+    try:
+        files = [f for f in os.listdir(folder) if f.endswith('.json')]
+        return jsonify(files)
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
 from App.accounts.models import User
 
 @login_manager.user_loader

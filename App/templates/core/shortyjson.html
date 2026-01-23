@@ -6,23 +6,60 @@ ShortyJSON
 <span>Shorty - {{ session["user"] }}</span>
 {% endblock %}
 {% block content %}
+    <form method="post">
+        <select name="filename" id="jsonSelect">
+            <option value="">Select a JSON file</option>
+        </select>
+    </form>
     {% if session.table_json %}
-        <form method="post" enctype="multipart/form-data">
-            <input type="file" name="file" accept="application/json">
-            <input type="submit" value="Upload">
-            <span>{{ session.filenamejson }}</span>
-        </form>
         <div>{{ session.table_json | safe }}</div>
     {% else %}
-        <h2>Upload your Shorty JSON File</h2>
-        <form method="post" enctype="multipart/form-data">
-            <input type="file" name="file" accept="applicatiion/json"><br>
-            <input type="submit" value="Upload">
-        </form>
-        <br>
-        <div class="message">Please upload a JSON file to display its content.</div>
+        <div class="message">Please select a JSON file to display its content.</div>
     {% endif %}
     <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentFilename = "{{ session.filenamejson }}";
+            const jsonSelect = document.getElementById('jsonSelect');
+
+            // Populate the select
+            fetch('/list_json').then(response => response.json()).then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else if (Array.isArray(data)) {
+                    data.forEach(f => {
+                        const option = document.createElement('option');
+                        option.value = f;
+                        option.text = f;
+                        jsonSelect.appendChild(option);
+                    });
+                    // Set selected if current
+                    if (currentFilename) {
+                        const basename = currentFilename.split('/').pop();
+                        jsonSelect.value = basename;
+                    }
+                }
+            }).catch(error => {
+                alert('Error loading JSON list: ' + error);
+            });
+
+            // Auto-load last JSON if no current
+            if (!currentFilename) {
+                const lastJson = localStorage.getItem('lastJsonFilename');
+                if (lastJson) {
+                    jsonSelect.value = lastJson;
+                    jsonSelect.form.submit();
+                }
+            }
+
+            // Handle change
+            jsonSelect.addEventListener('change', function() {
+                if (this.value) {
+                    localStorage.setItem('lastJsonFilename', this.value);
+                    this.form.submit();
+                }
+            });
+        });
+
         document.addEventListener('click', function(event) {
             if (event.target && event.target.id === 'copy-button') {
                 const leftCellText = event.target.closest('td').previousElementSibling.innerText;
@@ -32,25 +69,51 @@ ShortyJSON
                     console.error('Could not copy text: ', err);
                 });
             } else if (event.target && event.target.id === 'edit-button') {
-                const leftCell = event.target.closest('td').previousElementSibling;
+                const row = event.target.closest('tr');
+                const cells = row.querySelectorAll('td');
                 if (event.target.innerText === 'Edit') {
-                    leftCell.contentEditable = 'true';
+                    for (let i = 0; i < cells.length - 1; i++) {
+                        cells[i].contentEditable = 'true';
+                    }
                     event.target.innerText = 'Save';
                 } else {
-                    leftCell.contentEditable = 'false';
+                    for (let i = 0; i < cells.length - 1; i++) {
+                        cells[i].contentEditable = 'false';
+                    }
                     event.target.innerText = 'Edit';
-                    // Save the updated HTML to disk
-                    const updatedHtml = document.querySelector('table').outerHTML;
-                    fetch('/save', {
+                    // Parse table to JSON and save
+                    const table = document.querySelector('table');
+                    const headers = Array.from(table.querySelectorAll('thead th')).slice(0, -1).map(th => th.textContent.trim());
+                    const rows = Array.from(table.querySelectorAll('tbody tr'));
+                    const jsonData = rows.map(row => {
+                        const cells = Array.from(row.querySelectorAll('td')).slice(0, -1);
+                        const obj = {};
+                        headers.forEach((header, index) => {
+                            obj[header] = cells[index].innerText.trim();
+                        });
+                        return obj;
+                    });
+                    fetch('/save_json', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ html: updatedHtml })
-                    }).then(response => response.json()).then(data => {
-                        alert(data.message);
+                        body: JSON.stringify({ json: jsonData })
+                    }).then(response => {
+                        if (response.url.includes('login')) {
+                            alert('Session expired, please log in again.');
+                            return;
+                        }
+                        return response.json();
+                    }).then(data => {
+                        if (data) {
+                            alert(data.message);
+                            if (data.table_json) {
+                                document.querySelector('table').outerHTML = data.table_json;
+                            }
+                        }
                     }).catch(error => {
-                        console.error('Error saving file:', error);
+                        alert('Error saving file: ' + error);
                     });
                 }
             }

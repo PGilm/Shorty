@@ -69,7 +69,7 @@ def login():
             login_user(user)
             session.permanent = True
             session["user"] = user
-            return redirect(url_for('twofaverify'))
+            return redirect(url_for('verify_2fa'))
         else:
             flash('Invalid username or password.', 'danger')
     return render_template('accounts/login.html')
@@ -89,11 +89,13 @@ def setup_2fa():
 @app.route('/twofaverify', methods=['GET', 'POST'])
 @login_required
 def verify_2fa():
+    if not current_user.two_factor_secret:
+        return redirect(url_for('setup_2fa'))
     if request.method == 'POST':
         otp = request.form.get('otp')
-        totp = sf.pyotp.TOTP(current_user.secret_token)
+        totp = sf.pyotp.TOTP(current_user.two_factor_secret)
         if totp.verify(otp):
-            flash('2FA setup complete.', 'success')
+            flash('2FA verification successful.', 'success')
             return redirect(url_for('home'))
         else:
             flash('Invalid OTP. Please try again.', 'danger')
@@ -163,7 +165,47 @@ def shortytable(table_html=None):
 @login_required
 def shortyjson(table_json=None):
     if request.method == 'POST':
-        sf.get_ShortyJson()
+        filename = request.form.get('filename')
+        if filename:
+            # load from file
+            path = '/Users/pg/proj/Shorty/-ShortyTables/' + filename
+            try:
+                with open(path, 'r') as f:
+                    json_content = f.read()
+                data = json.loads(json_content)
+                # Convert JSON data to HTML table
+                table_json = f'<table id="{filename}" class="ShortyTable">'
+                if isinstance(data, list) and data:
+                    # Assuming the JSON data is a list of dictionaries
+                    headers = sorted(data[0].keys())
+                    table_json += '<thead><tr>'
+                    for header in headers:
+                        table_json += f'<th><div>{header}</div></th>' 
+                    table_json += '<th><div>Actions</div></th></tr></thead><tbody>'
+                    for row in data:
+                        table_json += '<tr>'
+                        for cell in row.values():
+                            table_json += f'<td><div>{cell.replace("\n", "<br>")}</div></td>'
+                        table_json += '''
+                            <td>
+                                <button type="button" id="copy-button" class="smbtn smbtn-copy">Copy</button>
+                                <button type="button" id="edit-button" class="smbtn smbtn-edit">Edit</button>
+                                <button type="button" id="delete-button" class="smbtn smbtn-delete">Delete</button>
+                            </td>
+                        '''
+                        table_json += '</tr>'
+                    table_json += '</tbody></table>'
+                    session["table_json"] = table_json
+                    session["filenamejson"] = path
+                    return render_template('core/shortyjson.html', table_json=session["table_json"])
+                else:
+                    session["table_json"] = "Invalid JSON format or empty data."
+                    return render_template('core/shortyjson.html', table_json=None)
+            except Exception as e:
+                session["table_json"] = f"Error loading file: {e}"
+                return render_template('core/shortyjson.html', table_json=None)
+        else:
+            sf.get_ShortyJson()
 
     if "table_json" in session:
         return render_template(
@@ -175,43 +217,45 @@ def shortyjson(table_json=None):
         table_json = None
         )
 
-@app.route('/save', methods=['POST'])
+@app.route('/save_json', methods=['POST'])
 @login_required
-def save():
+def save_json():
     data = request.get_json()
-    updated_html = data.get('html')
+    json_data = data.get('json')
     path = data.get('path')
     if path:
         filename = path
-        session['filenamehtml'] = path
+        session['filenamejson'] = path
     else:
-        filename = session.get('filenamehtml', 'updated_file.html')
+        filename = session.get('filenamejson', 'data.json')
     try:
         with open(filename, 'w') as file:
-            file.write(updated_html)
-        # Process the updated HTML to add actions and update session
-        soup = BeautifulSoup(updated_html, 'html.parser')
-        table = soup.find('table')
-        if table:
-            if 'ShortyTable' not in table.get('class', []):
-                table['class'] = table.get('class', []) + ['ShortyTable']
-            for row in table.find_all('tr'):
-                new_cell = soup.new_tag('td')
-                copy_button = soup.new_tag('button', type='button', id='copy-button', **{'class': 'smbtn smbtn-copy'})
-                copy_button.string = 'Copy'
-                new_cell.append(copy_button)
-                edit_button = soup.new_tag('button', type='button', id='edit-button', **{'class': 'smbtn smbtn-edit'})
-                edit_button.string = 'Edit'
-                new_cell.append(edit_button)
-                delete_button = soup.new_tag('button', type='button', id='delete-button', **{'class': 'smbtn smbtn-delete'})
-                delete_button.string = 'Delete'
-                new_cell.append(delete_button)
-                row.append(new_cell)
-            updated_table_html = str(table)
-            session["table_html"] = updated_table_html
-            return jsonify({'message': 'File saved successfully', 'table_html': updated_table_html})
+            json.dump(json_data, file, indent=4)
+        # Update session with the new table HTML
+        table_json = f'<table id="{os.path.basename(filename)}" class="ShortyTable">'
+        if json_data:
+            headers = sorted(json_data[0].keys())
+            table_json += '<thead><tr>'
+            for header in headers:
+                table_json += f'<th><div>{header}</div></th>' 
+            table_json += '<th><div>Actions</div></th></tr></thead><tbody>'
+            for row in json_data:
+                table_json += '<tr>'
+                for cell in row.values():
+                    table_json += f'<td><div>{cell.replace("\n", "<br>")}</div></td>'
+                table_json += '''
+                    <td>
+                        <button type="button" id="copy-button" class="smbtn smbtn-copy">Copy</button>
+                        <button type="button" id="edit-button" class="smbtn smbtn-edit">Edit</button>
+                        <button type="button" id="delete-button" class="smbtn smbtn-delete">Delete</button>
+                    </td>
+                '''
+                table_json += '</tr>'
+            table_json += '</tbody></table>'
         else:
-            return jsonify({'message': 'File saved successfully'})
+            table_json = "No data"
+        session["table_json"] = table_json
+        return jsonify({'message': 'File saved successfully', 'table_json': table_json})
     except Exception as e:
         return jsonify({'message': f'Error saving file: {e}'})
 

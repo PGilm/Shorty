@@ -1,10 +1,10 @@
 [
-  {
-    "short_form": "Short form",
-    "long_note": "This is the <strong>FIRST</strong> long note I have!"
-  },
-  {
-    "short_form": "Another short form",
-    "long_note": "Here is another <em>formatted</em> long note."
-  }
+    {
+        "long_note": "1",
+        "short_form": "This is the FIRST long note I have!\ntest\ntest"
+    },
+    {
+        "long_note": "2",
+        "short_form": "Another short form\nHere is another formatted long note."
+    }
 ]

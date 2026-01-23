@@ -6,25 +6,15 @@ ShortyTable
 <span>Shorty - {{ session["user"] }}</span>
 {% endblock %}
 {% block content %}
+    <form method="post">
+        <select name="filename" id="tableSelect">
+            <option value="">Select a table file</option>
+        </select>
+    </form>
     {% if session.table_html %}
-        <form method="post" enctype="multipart/form-data" action="/shortytable/">
-            <select id="tableSelect" name="filename">
-                <option value="">Select a table...</option>
-            </select>
-            <input type="submit" value="Load">
-            <span>{{ session.filenamehtml }}</span>
-        </form>
         <div>{{ session.table_html | safe }}</div>
     {% else %}
-        <h2>Select your Shorty Table</h2>
-        <form method="post" enctype="multipart/form-data" action="/shortytable/">
-            <select id="tableSelect" name="filename">
-                <option value="">Select a table...</option>
-            </select>
-            <input type="submit" value="Load">
-        </form>
-        <br>
-        <div class="message">Please select a HTML table file to display its content.</div>
+        <div class="message">Please select a table file to display its content.</div>
     {% endif %}
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -79,12 +69,17 @@ ShortyTable
                     console.error('Could not copy text: ', err);
                 });
             } else if (event.target && event.target.id === 'edit-button') {
-                const leftCell = event.target.closest('td').previousElementSibling;
+                const row = event.target.closest('tr');
+                const cells = row.querySelectorAll('td');
                 if (event.target.innerText === 'Edit') {
-                    leftCell.contentEditable = 'true';
+                    for (let i = 0; i < cells.length - 1; i++) {
+                        cells[i].contentEditable = 'true';
+                    }
                     event.target.innerText = 'Save';
                 } else {
-                    leftCell.contentEditable = 'false';
+                    for (let i = 0; i < cells.length - 1; i++) {
+                        cells[i].contentEditable = 'false';
+                    }
                     event.target.innerText = 'Edit';
                     // Prepare the updated HTML, removing actions column
                     const table = document.querySelector('table');
@@ -118,13 +113,21 @@ ShortyTable
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({ html: updatedHtml })
-                    }).then(response => response.json()).then(data => {
-                        alert(data.message);
-                        if (data.table_html) {
-                            document.querySelector('table').outerHTML = data.table_html;
+                    }).then(response => {
+                        if (response.url.includes('login')) {
+                            alert('Session expired, please log in again.');
+                            return;
+                        }
+                        return response.json();
+                    }).then(data => {
+                        if (data) {
+                            alert(data.message);
+                            if (data.table_html) {
+                                document.querySelector('table').outerHTML = data.table_html;
+                            }
                         }
                     }).catch(error => {
-                        console.error('Error saving file:', error);
+                        alert('Error saving file: ' + error);
                     });
                 }
             }
