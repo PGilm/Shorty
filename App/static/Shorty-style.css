@@ -91,7 +91,8 @@ table.ShortyTable td:nth-child(2) {
 
 table.ShortyTable td:nth-child(3) {
     width: 5%;
-    background-color: darkgreen
+    background-color: darkgreen;
+    padding: 0;
 }
 
 .smbtn {
@@ -100,8 +101,13 @@ table.ShortyTable td:nth-child(3) {
     margin: 1px;
     padding: 2px;
     font-size: .8em;
-	height: 33%;
+    height: 33%;
     overflow: hidden;
+}
+
+/* when inside the actions column keep normal block-level button sizing */
+table.ShortyTable td:nth-child(3) .smbtn {
+    margin: 1px 0;
 }
 
 .smbtn-copy {

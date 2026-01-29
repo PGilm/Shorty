@@ -8,6 +8,7 @@ from flask_login import LoginManager, login_user, current_user, login_required
 from datetime import datetime, timedelta
 import os
 from bs4 import BeautifulSoup
+from streamlit import html
 
 core_bp = Blueprint("core", __name__)
 
@@ -140,10 +141,25 @@ def shortytable(table_html=None):
                         row.append(new_cell)
                     session["table_html"] = str(table)
                     session["filenamehtml"] = path
-                    return render_template('core/shortytable.html', table_html=session["table_html"])
+                    #return render_template(
+                        # 'core/shortytable.html', 
+                        # table_html=session["table_html"])
+                    return render_template(
+                        'core/shortytable.html',
+                        table_html=session["table_html"],
+                        filenamehtml=session["filenamehtml"]
+                    )
+
                 else:
                     session["table_html"] = "No table found in the HTML file."
-                    return render_template('core/shortytable.html', table_html=None)
+                    #return render_template('core/shortytable.html', table_html=None)
+                    
+                    return render_template(
+                        'core/shortytable.html',
+                        table_html=session["table_html"],
+                        filenamehtml=session["filenamehtml"]
+                    )
+                                        
             except Exception as e:
                 session["table_html"] = f"Error loading file: {e}"
                 return render_template('core/shortytable.html', table_html=None)
@@ -153,11 +169,13 @@ def shortytable(table_html=None):
     if "table_html" in session:
         return render_template(
             "core/shortytable.html",
-            table_html = session["table_html"]
+            table_html = session["table_html"],
+            filenamehtml = session.get("filenamehtml")
         )
     return render_template(
         'core/shortytable.html',
-        table_html = None
+        table_html = None,
+        filenamehtml = session.get("filenamehtml")
         )
 
 @app.route("/shortyjson/", methods=['GET', 'POST'])
@@ -259,6 +277,119 @@ def save_json():
     except Exception as e:
         return jsonify({'message': f'Error saving file: {e}'})
 
+#
+
+@app.route('/save_html', methods=['POST'])
+@login_required
+def save_html():
+    
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'message': 'Invalid HTML payload'}), 400
+    
+    html = data.get("html")
+    path = data.get("path")
+
+    if not html or not path:
+        return jsonify({"error": "Missing html or path"}), 400
+    
+    html_content = data.get('html')
+    path = data.get('path')
+
+    if not html_content or not path:
+        return jsonify({'message': 'Missing html or path'}), 400
+
+    try:
+        # Parse HTML
+        soup = BeautifulSoup(html_content, 'html.parser')
+        table = soup.find('table')
+
+        if not table:
+            return jsonify({'message': 'No table found'}), 400
+
+        # Remove the runtime Actions column (if present) before persisting
+        for row in table.find_all('tr'):
+            cells = row.find_all('td')
+            if len(cells) > 2:
+                cells[-1].decompose()  # remove last cell
+
+        # Write cleaned HTML back to file
+        with open(path, 'w') as f:
+            f.write(str(table))
+
+        # For the response we want to include the runtime Actions column
+        display_soup = BeautifulSoup(str(table), 'html.parser')
+        for row in display_soup.find_all('tr'):
+            # append the actions cell for the UI with proper classes for styling
+            new_cell = display_soup.new_tag('td')
+            copy_button = display_soup.new_tag('button', type='button', id='copy-button')
+            copy_button.string = 'Copy'
+            copy_button['class'] = 'smbtn smbtn-copy'
+            new_cell.append(copy_button)
+            edit_button = display_soup.new_tag('button', type='button', id='edit-button')
+            edit_button.string = 'Edit'
+            edit_button['class'] = 'smbtn smbtn-edit'
+            new_cell.append(edit_button)
+            delete_button = display_soup.new_tag('button', type='button', id='delete-button')
+            delete_button.string = 'Delete'
+            delete_button['class'] = 'smbtn smbtn-delete'
+            new_cell.append(delete_button)
+            row.append(new_cell)
+
+        session["table_html"] = str(display_soup.find('table'))
+
+        return jsonify({'message': 'HTML file saved successfully', 'table_html': session["table_html"]})
+
+    except Exception as e:
+        return jsonify({'message': f'Error saving HTML: {e}'})
+
+
+@app.route('/create_table', methods=['POST'])
+@login_required
+def create_table():
+    data = request.get_json(silent=True)
+    filename = data.get('filename') if data else None
+    if not filename:
+        return jsonify({'error': 'Missing filename'}), 400
+    # sanitize filename
+    safe = re.sub(r'[^A-Za-z0-9_\- ]', '', filename).strip()
+    if not safe:
+        return jsonify({'error': 'Invalid filename'}), 400
+    folder = '/Users/pg/proj/Shorty/-ShortyTables'
+    path = os.path.join(folder, f"{safe}.html")
+    if os.path.exists(path):
+        return jsonify({'error': 'File already exists'}), 400
+    try:
+        with open(path, 'w') as f:
+            f.write(f'<table id="{safe}" class="ShortyTable"><tbody></tbody></table>')
+        return jsonify({'success': True, 'filename': f'{safe}.html', 'path': path})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/create_json', methods=['POST'])
+@login_required
+def create_json():
+    data = request.get_json(silent=True)
+    filename = data.get('filename') if data else None
+    if not filename:
+        return jsonify({'error': 'Missing filename'}), 400
+    safe = re.sub(r'[^A-Za-z0-9_\- ]', '', filename).strip()
+    if not safe:
+        return jsonify({'error': 'Invalid filename'}), 400
+    folder = '/Users/pg/proj/Shorty/-ShortyTables'
+    path = os.path.join(folder, f"{safe}.json")
+    if os.path.exists(path):
+        return jsonify({'error': 'File already exists'}), 400
+    try:
+        with open(path, 'w') as f:
+            json.dump([], f)
+        return jsonify({'success': True, 'filename': f'{safe}.json', 'path': path})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+#
 # For Demo purpose
 @core_bp.route("/api/data/")
 def get_data():

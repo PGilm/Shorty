@@ -6,10 +6,12 @@ ShortyJSON
 <span>Shorty - {{ session["user"] }}</span>
 {% endblock %}
 {% block content %}
-    <form method="post">
+    <form method="post" id="json-form">
+        <button type="button" id="new-json-btn" class="btn">New JSON</button>
         <select name="filename" id="jsonSelect">
             <option value="">Select a JSON file</option>
         </select>
+        <button type="button" id="add-row-btn" class="btn" style="float:right">Add Row</button>
     </form>
     {% if session.table_json %}
         <div>{{ session.table_json | safe }}</div>
@@ -58,64 +60,104 @@ ShortyJSON
                     this.form.submit();
                 }
             });
+
+            // New JSON button
+            document.getElementById('new-json-btn').addEventListener('click', function(){
+                const name = prompt('New JSON filename (no extension):');
+                if (!name) return;
+                fetch('/create_json', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename: name })
+                }).then(r=>r.json()).then(data=>{
+                    if (data && data.success) {
+                        jsonSelect.value = data.filename;
+                        localStorage.setItem('lastJsonFilename', data.filename);
+                        jsonSelect.form.submit();
+                    } else {
+                        alert('Error creating file: ' + (data.error || 'unknown'));
+                    }
+                }).catch(e=>{alert('Error: '+e)});
+            });
+
+            // Add Row button: add an editable blank row at top
+            document.getElementById('add-row-btn').addEventListener('click', function(){
+                const table = document.querySelector('table');
+                if (!table) { alert('No table loaded'); return; }
+                const tbody = table.querySelector('tbody');
+                const headers = Array.from(table.querySelectorAll('thead th')).slice(0,-1);
+                const newRow = document.createElement('tr');
+                let cellsHtml = '';
+                for (let i=0;i<headers.length;i++) {
+                    cellsHtml += '<td><div contenteditable="true"></div></td>';
+                }
+                cellsHtml += '<td><button type="button" id="copy-button" class="smbtn smbtn-copy">Copy</button>' +
+                             '<button type="button" id="edit-button" class="smbtn smbtn-edit">Save</button>' +
+                             '<button type="button" id="delete-button" class="smbtn smbtn-delete">Delete</button></td>';
+                newRow.innerHTML = cellsHtml;
+                if (tbody.firstChild) tbody.insertBefore(newRow, tbody.firstChild);
+                else tbody.appendChild(newRow);
+                applyTableStyles();
+            });
         });
 
+        function applyTableStyles(){
+            $("table").css({"table-layout":"fixed","width":"100%"});
+            $("table, th, td").css({"border":".1em solid darkgreen"});
+            $("button.smbtn").css({"width":"100%", "height":"33%","text-align":"center"});
+            // Keep the row height fixed; make inner div use a fixed height with scrollable content so rows don't expand
+            $("td").css({"padding":"0","vertical-align":"top"});
+            $("td div").css({"display":"block","background-color":"lightgray","height":"4.5em","max-height":"4.5em","width":"100%","box-sizing":"border-box","font-size":".8em","overflow":"auto","padding":".3em"});
+            // Actions column: use standard block-stacked buttons (no flex) so height is consistent
+            $("button.smbtn").css({"width":"100%", "height":"33%","text-align":"center","margin":"1px","padding":"2px"});
+        }
+
+        function saveJsonTableToServer(){
+            const table = document.querySelector('table');
+            if (!table) { alert('No table to save'); return; }
+            const headers = Array.from(table.querySelectorAll('thead th')).slice(0,-1).map(th => th.textContent.trim());
+            const rows = Array.from(table.querySelectorAll('tbody tr'));
+            const jsonData = rows.map(row => {
+                const cells = Array.from(row.querySelectorAll('td')).slice(0,-1);
+                const obj = {};
+                headers.forEach((header, index) => obj[header] = cells[index] ? cells[index].innerText.trim() : '');
+                return obj;
+            });
+            fetch('/save_json', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ json: jsonData })
+            }).then(r=>{ if (r.url.includes('login')) { alert('Session expired, please log in again.'); return; } return r.json(); })
+            .then(data=>{ if (data){ alert(data.message); if (data.table_json){ document.querySelector('table').outerHTML = data.table_json; applyTableStyles(); } } }).catch(e=>alert('Error: '+e));
+        }
+
         document.addEventListener('click', function(event) {
-            if (event.target && event.target.id === 'copy-button') {
+            if (event.target && (event.target.id === 'copy-button' || event.target.classList.contains('smbtn-copy'))) {
                 const leftCellText = event.target.closest('td').previousElementSibling.innerText;
-                navigator.clipboard.writeText(leftCellText).then(function() {
-                    alert('Cell text copied to clipboard');
-                }, function(err) {
-                    console.error('Could not copy text: ', err);
-                });
-            } else if (event.target && event.target.id === 'edit-button') {
+                navigator.clipboard.writeText(leftCellText).then(function() { alert('Cell text copied to clipboard'); }, function(err) { console.error('Could not copy text: ', err); });
+                return;
+            }
+
+            if (event.target && (event.target.id === 'edit-button' || event.target.classList.contains('smbtn-edit'))) {
                 const row = event.target.closest('tr');
                 const cells = row.querySelectorAll('td');
-                if (event.target.innerText === 'Edit') {
-                    for (let i = 0; i < cells.length - 1; i++) {
-                        cells[i].contentEditable = 'true';
-                    }
+                if (event.target.innerText.trim() === 'Edit') {
+                    for (let i = 0; i < cells.length - 1; i++) cells[i].contentEditable = 'true';
                     event.target.innerText = 'Save';
                 } else {
-                    for (let i = 0; i < cells.length - 1; i++) {
-                        cells[i].contentEditable = 'false';
-                    }
+                    for (let i = 0; i < cells.length - 1; i++) cells[i].contentEditable = 'false';
                     event.target.innerText = 'Edit';
-                    // Parse table to JSON and save
-                    const table = document.querySelector('table');
-                    const headers = Array.from(table.querySelectorAll('thead th')).slice(0, -1).map(th => th.textContent.trim());
-                    const rows = Array.from(table.querySelectorAll('tbody tr'));
-                    const jsonData = rows.map(row => {
-                        const cells = Array.from(row.querySelectorAll('td')).slice(0, -1);
-                        const obj = {};
-                        headers.forEach((header, index) => {
-                            obj[header] = cells[index].innerText.trim();
-                        });
-                        return obj;
-                    });
-                    fetch('/save_json', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ json: jsonData })
-                    }).then(response => {
-                        if (response.url.includes('login')) {
-                            alert('Session expired, please log in again.');
-                            return;
-                        }
-                        return response.json();
-                    }).then(data => {
-                        if (data) {
-                            alert(data.message);
-                            if (data.table_json) {
-                                document.querySelector('table').outerHTML = data.table_json;
-                            }
-                        }
-                    }).catch(error => {
-                        alert('Error saving file: ' + error);
-                    });
+                    saveJsonTableToServer();
                 }
+                return;
+            }
+
+            if (event.target && (event.target.id === 'delete-button' || event.target.classList.contains('smbtn-delete'))) {
+                if (!confirm('Delete this row?')) return;
+                const row = event.target.closest('tr');
+                row.parentNode.removeChild(row);
+                saveJsonTableToServer();
+                return;
             }
         });
 
