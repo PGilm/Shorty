@@ -179,6 +179,9 @@ def shortyjson(table_json=None):
             folder = os.path.join(base, username) if username else base
             path = os.path.join(folder, filename)
             try:
+                # remember which filename the user requested so the client-side
+                # auto-load logic does not repeatedly re-submit on error
+                session["filenamejson"] = path
                 with open(path, 'r') as f:
                     json_content = f.read()
                 data = json.loads(json_content)
@@ -211,8 +214,10 @@ def shortyjson(table_json=None):
                     session["table_json"] = "Invalid JSON format or empty data."
                     return render_template('core/shortyjson.html', table_json=None)
             except Exception as e:
+                # ensure filename is persisted so client won't endlessly re-submit
+                session["filenamejson"] = path
                 session["table_json"] = f"Error loading file: {e}"
-                return render_template('core/shortyjson.html', table_json=None)
+                return render_template('core/shortyjson.html', table_json=session.get("table_json"))
         else:
             sf.get_ShortyJson()
 

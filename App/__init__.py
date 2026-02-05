@@ -1,5 +1,6 @@
 from decouple import config
 from flask import Flask
+import os
 from flask_bcrypt import Bcrypt
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
@@ -10,6 +11,23 @@ from datetime import timedelta
 
 app = Flask(__name__)
 app.config.from_object(config("APP_SETTINGS"))
+
+# Ensure session cookie works predictably behind proxies/load-balancers.
+# Use Lax so top-level navigations (form submits) send the cookie; in
+# cross-site setups set to 'None' and enable `SESSION_COOKIE_SECURE`.
+app.config.setdefault('SESSION_COOKIE_SAMESITE', 'Lax')
+if os.environ.get('FORCE_SECURE_COOKIES') == '1':
+    app.config['SESSION_COOKIE_SECURE'] = True
+
+# If the app is behind a reverse proxy (nginx/ALB) the ProxyFix ensures
+# Flask sees the original host and scheme so cookies and redirects are
+# generated correctly. Enable via environment when appropriate.
+if os.environ.get('ENABLE_PROXYFIX', '1') == '1':
+    try:
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    except Exception:
+        app.logger.warning('ProxyFix not applied; werkzeug may be missing')
 
 login_manager = LoginManager() # Add this line
 login_manager.init_app(app) # Add this line
@@ -66,6 +84,7 @@ def list_json():
     from flask import jsonify, session
     from flask_login import current_user
     import os
+    from flask import request as _flask_request
     base = '/Users/pg/proj/Shorty/-ShortyTables'
     username = None
     try:
@@ -79,10 +98,13 @@ def list_json():
             username = su
     folder = os.path.join(base, username) if username else base
     try:
+        # Log request for remote debugging
+        app.logger.info(f"list_json called from {_flask_request.remote_addr}; folder={folder}")
         os.makedirs(folder, exist_ok=True)
         files = [f for f in os.listdir(folder) if f.endswith('.json')]
         return jsonify(files)
     except Exception as e:
+        app.logger.exception("Error in list_json")
         return jsonify({'error': str(e)})
 
 from App.accounts.models import User

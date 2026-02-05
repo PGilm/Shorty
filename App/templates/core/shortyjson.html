@@ -29,26 +29,45 @@ ShortyJSON
             const currentFilename = "{{ session.filenamejson }}";
             const jsonSelect = document.getElementById('jsonSelect');
 
-            // Populate the select
-            fetch('/list_json').then(response => response.json()).then(data => {
-                if (data.error) {
-                    alert('Error: ' + data.error);
-                } else if (Array.isArray(data)) {
-                    data.forEach(f => {
-                        const option = document.createElement('option');
-                        option.value = f;
-                        option.text = f;
-                        jsonSelect.appendChild(option);
-                    });
-                    // Set selected if current
-                    if (currentFilename) {
-                        const basename = currentFilename.split('/').pop();
-                        jsonSelect.value = basename;
+            // Populate the select and only auto-submit after the list is loaded.
+            if (!window._shorty_list_json_fetched) {
+                window._shorty_list_json_fetched = true;
+                fetch('/list_json').then(response => response.json()).then(data => {
+                    if (data.error) {
+                        alert('Error: ' + data.error);
+                        return;
                     }
-                }
-            }).catch(error => {
-                alert('Error loading JSON list: ' + error);
-            });
+                    if (Array.isArray(data)) {
+                        data.forEach(f => {
+                            const option = document.createElement('option');
+                            option.value = f;
+                            option.text = f;
+                            jsonSelect.appendChild(option);
+                        });
+                        // Set selected if current
+                        if (currentFilename) {
+                            const basename = currentFilename.split('/').pop();
+                            jsonSelect.value = basename;
+                        } else {
+                            // Auto-load previously-used filename only if it exists on the server
+                            const lastJson = localStorage.getItem('lastJsonFilename');
+                            if (lastJson && !window._shorty_json_autosubmitted) {
+                                // only submit if the option exists in the populated list
+                                const exists = Array.from(jsonSelect.options).some(o => o.value === lastJson);
+                                if (exists) {
+                                    window._shorty_json_autosubmitted = true;
+                                    jsonSelect.value = lastJson;
+                                    jsonSelect.form.submit();
+                                } else {
+                                    localStorage.removeItem('lastJsonFilename');
+                                }
+                            }
+                        }
+                    }
+                }).catch(error => {
+                    alert('Error loading JSON list: ' + error);
+                });
+            }
 
             // Auto-load last JSON if no current
             if (!currentFilename) {

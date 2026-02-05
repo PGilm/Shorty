@@ -50,7 +50,14 @@ def register():
 
 
 @accounts_bp.route("/login", methods=["GET", "POST"])
+@accounts_bp.route("/login/", methods=["GET", "POST"])
 def login():
+    # Log incoming request method/URL/remote for debugging 405 issues
+    try:
+        from flask import current_app
+        current_app.logger.info(f"accounts.login called: method={request.method} url={request.url} remote={request.remote_addr} headers={dict(request.headers)}")
+    except Exception:
+        pass
     if current_user.is_authenticated:
         if current_user.is_two_factor_authentication_enabled:
             flash("You are already logged in.", "info")
@@ -116,8 +123,13 @@ def verify_two_factor_auth():
                 session.permanent = True
                 session["user"] = current_user.username
                 if form.twoFA.data == 1 or form.twoFA.data is True:
-                    flash("You previously saved this device", "success")
-                #     db.session.add("device_saved") = "Yes"
+                    try:
+                        current_user.device_saved = "Yes"
+                        db.session.commit()
+                        flash("You previously saved this device", "success")
+                    except Exception:
+                        db.session.rollback()
+                        flash("Failed to save device preference", "warning")
                 return redirect(url_for(HOME_URL, name=current_user.username))
             else:
                 try:
@@ -132,8 +144,13 @@ def verify_two_factor_auth():
                     session.permanent = True
                     session["user"] = current_user.username
                     if form.twoFA.data is True or form.twoFA.data == 1:
-                        flash("You have successfully saved this device", "success")
-                        current_user.device_saved = "Yes"
+                        try:
+                            current_user.device_saved = "Yes"
+                            db.session.commit()
+                            flash("You have successfully saved this device", "success")
+                        except Exception:
+                            db.session.rollback()
+                            flash("Failed to save device preference", "warning")
                     return redirect(url_for(HOME_URL, name=current_user.username))
                 except Exception:
                     db.session.rollback()
