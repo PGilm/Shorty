@@ -14,7 +14,7 @@ ShortyTable
         <select name="filename" id="tableSelect">
             <option value="">Select a table file</option>
         </select>
-        <button type="button" id="add-row-btn" class="btn" style="float:right">Add Row</button>
+        <button type="button" id="add-row-btn" class="btn">Add Row</button>
     </form>
     {% if session.table_html %}
         <div>{{ session.table_html | safe }}</div>
@@ -74,7 +74,14 @@ ShortyTable
                     body: JSON.stringify({ filename: name })
                 }).then(r=>r.json()).then(data=>{
                     if (data && data.success) {
-                        // select and submit to load
+                        // add the new file to the selector, select it and submit to load
+                        let opt = Array.from(tableSelect.options).find(o => o.value === data.filename);
+                        if (!opt) {
+                            opt = document.createElement('option');
+                            opt.value = data.filename;
+                            opt.text = data.filename;
+                            tableSelect.appendChild(opt);
+                        }
                         tableSelect.value = data.filename;
                         localStorage.setItem('lastTableFilename', data.filename);
                         tableSelect.form.submit();
@@ -127,19 +134,11 @@ ShortyTable
         });
 
         function applyTableStyles(){
-            // Re-apply the inline styles used elsewhere so new rows/buttons match
-            $("table").css({"table-layout":"fixed","width":"100%"});
-            $("table, th, td").css({"border":".1em solid darkgreen"});
-            $("button.smbtn").css({"width":"100%", "height":"33%","text-align":"center"});
-            // Keep the row height fixed; make inner div use a fixed height with scrollable content so rows don't expand
-            $("td").css({"padding":"0","vertical-align":"top"});
-            $("td div").css({"display":"block","background-color":"lightgray","height":"4.5em","max-height":"4.5em","width":"100%","box-sizing":"border-box","font-size":".8em","overflow":"auto","padding":".3em"});
-            $("div.bu").css({"overflow-y":"hidden"});
-            // Actions column: use standard block-stacked buttons (no flex) so height is consistent with JSON
-            $("button.smbtn").css({"width":"100%", "height":"33%","text-align":"center","margin":"1px","padding":"2px"});
-            $("td:eq(0)").css({"width":"15%"});
-            $("td:eq(1)").css({"width":"80%"});
-            $("td:eq(2)").css({"width":"15px"});
+            // Ensure table uses class-based styling instead of inline styles
+                const table = document.querySelector('table');
+                if (table) table.classList.add('ShortyTable');
+                // Remove residual inline styles that may have been applied
+                document.querySelectorAll('table, th, td, td div, button.smbtn').forEach(el => { if (el && el.style) el.style.cssText = ''; });
         }
 
         function saveCurrentTableToServer(){
@@ -163,6 +162,8 @@ ShortyTable
                     if (cells.length > 0) row.removeChild(cells[cells.length - 1]);
                 });
             }
+            // remove any inline style attributes so saved file remains unstyled
+            clonedTable.querySelectorAll('[style]').forEach(el => el.removeAttribute('style'));
             const updatedHtml = clonedTable.outerHTML;
             const filePathValue = document.getElementById('file-path').value;
             fetch('/save_html', {

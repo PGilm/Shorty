@@ -313,6 +313,20 @@ def save_html():
             if len(cells) > 2:
                 cells[-1].decompose()  # remove last cell
 
+        # Strip style, id, and event attributes. Keep only the element classes
+        # and a minimal set of attributes needed for editing/display (data-field,
+        # contenteditable). This ensures the saved HTML is the barest structure
+        # similar to HTML_Template.html.
+        for tag in table.find_all(True):
+            keep_attrs = {}
+            if 'class' in tag.attrs:
+                keep_attrs['class'] = tag.attrs.get('class')
+            if tag.name == 'td' and 'contenteditable' in tag.attrs:
+                keep_attrs['contenteditable'] = tag.attrs.get('contenteditable')
+            if 'data-field' in tag.attrs:
+                keep_attrs['data-field'] = tag.attrs.get('data-field')
+            tag.attrs = keep_attrs
+
         # Write cleaned HTML back to file
         with open(path, 'w') as f:
             f.write(str(table))
@@ -360,8 +374,19 @@ def create_table():
     if os.path.exists(path):
         return jsonify({'error': 'File already exists'}), 400
     try:
+        # create a minimal two-column table with one editable row so the UI
+        # displays at least one row when a new table is created
+        initial_table = (
+            f'<table id="{safe}" class="ShortyTable">'
+            '<tbody>'
+            '<tr>'
+            '<td contenteditable="true"><div></div></td>'
+            '<td contenteditable="true"><div></div></td>'
+            '</tr>'
+            '</tbody></table>'
+        )
         with open(path, 'w') as f:
-            f.write(f'<table id="{safe}" class="ShortyTable"><tbody></tbody></table>')
+            f.write(initial_table)
         return jsonify({'success': True, 'filename': f'{safe}.html', 'path': path})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -382,8 +407,11 @@ def create_json():
     if os.path.exists(path):
         return jsonify({'error': 'File already exists'}), 400
     try:
+        # Create a new json file with a single empty row scaffold so
+        # the UI displays a proper empty row when loading.
+        scaffold = [{"long_note": "", "short_form": ""}]
         with open(path, 'w') as f:
-            json.dump([], f)
+            json.dump(scaffold, f, indent=4)
         return jsonify({'success': True, 'filename': f'{safe}.json', 'path': path})
     except Exception as e:
         return jsonify({'error': str(e)}), 500

@@ -11,7 +11,7 @@ ShortyJSON
         <select name="filename" id="jsonSelect">
             <option value="">Select a JSON file</option>
         </select>
-        <button type="button" id="add-row-btn" class="btn" style="float:right">Add Row</button>
+        <button type="button" id="add-row-btn" class="btn">Add Row</button>
     </form>
     {% if session.table_json %}
         <div>{{ session.table_json | safe }}</div>
@@ -71,6 +71,14 @@ ShortyJSON
                     body: JSON.stringify({ filename: name })
                 }).then(r=>r.json()).then(data=>{
                     if (data && data.success) {
+                        // add the new JSON into the selector, select and submit
+                        let opt = Array.from(jsonSelect.options).find(o => o.value === data.filename);
+                        if (!opt) {
+                            opt = document.createElement('option');
+                            opt.value = data.filename;
+                            opt.text = data.filename;
+                            jsonSelect.appendChild(opt);
+                        }
                         jsonSelect.value = data.filename;
                         localStorage.setItem('lastJsonFilename', data.filename);
                         jsonSelect.form.submit();
@@ -102,14 +110,11 @@ ShortyJSON
         });
 
         function applyTableStyles(){
-            $("table").css({"table-layout":"fixed","width":"100%"});
-            $("table, th, td").css({"border":".1em solid darkgreen"});
-            $("button.smbtn").css({"width":"100%", "height":"33%","text-align":"center"});
-            // Keep the row height fixed; make inner div use a fixed height with scrollable content so rows don't expand
-            $("td").css({"padding":"0","vertical-align":"top"});
-            $("td div").css({"display":"block","background-color":"lightgray","height":"4.5em","max-height":"4.5em","width":"100%","box-sizing":"border-box","font-size":".8em","overflow":"auto","padding":".3em"});
-            // Actions column: use standard block-stacked buttons (no flex) so height is consistent
-            $("button.smbtn").css({"width":"100%", "height":"33%","text-align":"center","margin":"1px","padding":"2px"});
+                // Ensure table uses class-based styling instead of inline styles
+                const table = document.querySelector('table');
+                if (table) table.classList.add('ShortyTable');
+                // Remove residual inline styles that may have been applied
+                document.querySelectorAll('table, th, td, td div, button.smbtn').forEach(el => { if (el && el.style) el.style.cssText = ''; });
         }
 
         function saveJsonTableToServer(){
