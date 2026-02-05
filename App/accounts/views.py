@@ -4,6 +4,7 @@ from App.accounts.models import User
 from App import db, bcrypt
 from flask_login import current_user, login_required, login_user, logout_user
 from flask import Blueprint, flash, redirect, render_template, request, url_for, session
+from App.core.shorty_users import generate_shorty_users
 
 accounts_bp = Blueprint("accounts", __name__)
 
@@ -30,6 +31,14 @@ def register():
             db.session.commit()
 
             login_user(user)
+            session.permanent = True
+            session["user"] = user.username
+            # regenerate Shorty Users files to include the new user
+            try:
+                generate_shorty_users()
+            except Exception:
+                # non-fatal: ignore failures
+                pass
             flash("You are registered. You have to enable 2-Factor Authentication first to login.", "success")
 
             return redirect(url_for(SETUP_2FA_URL))
@@ -56,6 +65,8 @@ def login():
         user = User.query.filter_by(username=form.username.data).first()
         if user and bcrypt.check_password_hash(user.password, request.form["password"]):
             login_user(user)
+            session.permanent = True
+            session["user"] = user.username
             if not current_user.is_two_factor_authentication_enabled:
                 flash(
                     "You have not enabled 2-Factor Authentication. Please enable first to login.", "info")
@@ -73,7 +84,7 @@ def login():
     return render_template("accounts/login.html", form=form)
 
 
-@accounts_bp.route("/logout")
+@accounts_bp.route("/logout", methods=["GET", "POST"])
 @login_required
 def logout():
     # session.clear()
@@ -98,7 +109,8 @@ def setup_two_factor_auth():
 def verify_two_factor_auth():
     form = TwoFactorForm(request.form)
     if form.validate_on_submit():
-        if current_user.is_otp_valid(form.otp.data):
+        otp_val = (form.otp.data or '').strip()
+        if current_user.is_otp_valid(otp_val):
             if current_user.is_two_factor_authentication_enabled:
                 flash("2FA verification successful. You are logged in!", "success")
                 session.permanent = True
@@ -111,6 +123,11 @@ def verify_two_factor_auth():
                 try:
                     current_user.is_two_factor_authentication_enabled = True
                     db.session.commit()
+                    # regenerate Shorty Users files after user update
+                    try:
+                        generate_shorty_users()
+                    except Exception:
+                        pass
                     flash("2FA setup successful. You are logged in!", "success")
                     session.permanent = True
                     session["user"] = current_user.username

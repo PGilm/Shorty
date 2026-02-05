@@ -38,10 +38,24 @@ app.register_blueprint(core_bp)
 
 @app.route('/list_tables')
 def list_tables():
-    from flask import jsonify
+    from flask import jsonify, session
+    from flask_login import current_user
     import os
-    folder = '/Users/pg/proj/Shorty/-ShortyTables'
+    base = '/Users/pg/proj/Shorty/-ShortyTables'
+    # prefer authenticated user's folder, fall back to session user string
+    username = None
     try:
+        if current_user and getattr(current_user, 'is_authenticated', False):
+            username = getattr(current_user, 'username', None)
+    except Exception:
+        username = None
+    if not username:
+        su = session.get('user')
+        if isinstance(su, str):
+            username = su
+    folder = os.path.join(base, username) if username else base
+    try:
+        os.makedirs(folder, exist_ok=True)
         files = [f for f in os.listdir(folder) if f.endswith('.html')]
         return jsonify(files)
     except Exception as e:
@@ -49,10 +63,23 @@ def list_tables():
 
 @app.route('/list_json')
 def list_json():
-    from flask import jsonify
+    from flask import jsonify, session
+    from flask_login import current_user
     import os
-    folder = '/Users/pg/proj/Shorty/-ShortyTables'
+    base = '/Users/pg/proj/Shorty/-ShortyTables'
+    username = None
     try:
+        if current_user and getattr(current_user, 'is_authenticated', False):
+            username = getattr(current_user, 'username', None)
+    except Exception:
+        username = None
+    if not username:
+        su = session.get('user')
+        if isinstance(su, str):
+            username = su
+    folder = os.path.join(base, username) if username else base
+    try:
+        os.makedirs(folder, exist_ok=True)
         files = [f for f in os.listdir(folder) if f.endswith('.json')]
         return jsonify(files)
     except Exception as e:

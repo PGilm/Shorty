@@ -1,27 +1,33 @@
 {% extends "layout.html" %}
 {% block title %}
-ShortyTable
+ShortyHTML
 {% endblock %}
 {% block header %}
-<span>Shorty - {{ session["user"] }}</span>
+{% if current_user.is_authenticated %}
+    <span>{{ current_user.username }}</span>
+{% else %}
+    <span>Shorty</span>
+{% endif %}
 {% endblock %}
 {% block content %}
 
     <input type="hidden" id="file-path" value="{{ filenamehtml }}">
 
     <form method="post" id="table-form">
-        <button type="button" id="new-table-btn" class="btn">New Table</button>
+        <button type="button" id="new-table-btn" class="btn">New ShortyHTML</button>
         <select name="filename" id="tableSelect">
-            <option value="">Select a table file</option>
+            <option value="">Select an HTML file</option>
         </select>
         <button type="button" id="add-row-btn" class="btn">Add Row</button>
     </form>
     {% if session.table_html %}
         <div>{{ session.table_html | safe }}</div>
     {% else %}
-        <div class="message">Please select a table file to display its content.</div>
+        <div class="message"></div>
     {% endif %}
     <script>
+        // Defensive debug flag to avoid ReferenceError when checking `debg`
+        var debg = false;
         document.addEventListener('DOMContentLoaded', function() {
             const currentFilename = "{{ session.filenamehtml }}";
             const tableSelect = document.getElementById('tableSelect');
@@ -61,6 +67,16 @@ ShortyTable
                 if (this.value) {
                     localStorage.setItem('lastTableFilename', this.value);
                     this.form.submit();
+                } else {
+                    // user selected the empty/default option - clear displayed table
+                    fetch('/clear_table', { method: 'POST' }).then(r=>r.json()).then(data=>{
+                        if (!data || data.error) { console.error('clear_table error', data); return; }
+                        localStorage.removeItem('lastTableFilename');
+                        const msgDiv = document.querySelector('.message');
+                        if (msgDiv) msgDiv.textContent = '';
+                        const tbl = document.querySelector('table');
+                        if (tbl) tbl.remove();
+                    }).catch(e=>{ console.error('Error clearing table:', e); });
                 }
             });
 
@@ -188,7 +204,12 @@ ShortyTable
             // Copy
             if (event.target && (event.target.id === 'copy-button' || event.target.classList.contains('smbtn-copy'))) {
                 const leftCellText = event.target.closest('td').previousElementSibling.innerText;
-                navigator.clipboard.writeText(leftCellText).then(function() { alert('Cell text copied to clipboard'); }, function(err) { console.error('Could not copy text: ', err); });
+                copyTextToClipboard(leftCellText).then(function() {
+                    alert('Cell text copied to clipboard');
+                }).catch(function(err) {
+                    console.error('Could not copy text: ', err);
+                    alert('Copy failed');
+                });
                 return;
             }
 
@@ -221,6 +242,28 @@ ShortyTable
 
         // apply styles initially
         document.addEventListener('DOMContentLoaded', function(){ applyTableStyles(); });
+
+        // robust clipboard helper: prefer navigator.clipboard, fallback to textarea+execCommand
+        function copyTextToClipboard(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                return navigator.clipboard.writeText(text);
+            }
+            return new Promise(function(resolve, reject) {
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    // avoid scrolling to bottom
+                    ta.style.position = 'fixed';
+                    ta.style.left = '-9999px';
+                    document.body.appendChild(ta);
+                    ta.focus();
+                    ta.select();
+                    const ok = document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    if (ok) resolve(); else reject(new Error('execCommand copy failed'));
+                } catch (e) { reject(e); }
+            });
+        }
 
         $(document).ready(function(){
            $("html").css({"background-color":"green",

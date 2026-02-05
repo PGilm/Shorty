@@ -26,30 +26,28 @@ from App import bcrypt, db
 @core_bp.route("/") # base or no route renders user-home or new-login 
 # @login_required
 def none():
-    if "user" in session:
-            return render_template(
-                "core/home.html",
-                name = session["user"]
-            )
+    if current_user and getattr(current_user, 'is_authenticated', False):
+        return render_template(
+            "core/home.html",
+            name=current_user.username
+        )
     else:
         flash("Hello! This flash message because this is your first time?", "info")
-        return redirect(url_for("accounts.login"))
+        # Render the accounts login template directly to avoid redirect loops
+        return render_template('accounts/login.html')
 
 @core_bp.route("/home/")
 @core_bp.route("/home/<name>")
 @login_required
 def home(name = None):
     if request.method == 'POST':
-        session.clear # pop("user", None)
-        return redirect(url_for("login"))
-    if "user" in session:
-        # user = session["user"]
+        return redirect(url_for('accounts.login'))
+    if current_user and getattr(current_user, 'is_authenticated', False):
         return render_template(
-            "core/home.html",
-            name = session["user"] # user
+            'core/home.html',
+            name=current_user.username
         )
-    else:
-        return redirect(url_for("login"))
+    return redirect(url_for('accounts.login'))
 
 @app.route("/login-old/", methods=["POST", "GET"])
 def loginold():
@@ -60,20 +58,7 @@ def loginold():
     else:
         return render_template("loginold.html")
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        user = User.query.filter_by(username=username).first()
-        if user and bcrypt.check_password_hash(user.password, password):
-            login_user(user)
-            session.permanent = True
-            session["user"] = user
-            return redirect(url_for('verify_2fa'))
-        else:
-            flash('Invalid username or password.', 'danger')
-    return render_template('accounts/login.html')
+# Note: login is handled by the `accounts` blueprint at /login
 
 @app.route('/twofasetup', methods=['GET', 'POST'])
 @login_required
@@ -88,19 +73,9 @@ def setup_2fa():
     return render_template('twofasetup.html')
 
 @app.route('/twofaverify', methods=['GET', 'POST'])
-@login_required
 def verify_2fa():
-    if not current_user.two_factor_secret:
-        return redirect(url_for('setup_2fa'))
-    if request.method == 'POST':
-        otp = request.form.get('otp')
-        totp = sf.pyotp.TOTP(current_user.two_factor_secret)
-        if totp.verify(otp):
-            flash('2FA verification successful.', 'success')
-            return redirect(url_for('home'))
-        else:
-            flash('Invalid OTP. Please try again.', 'danger')
-    return render_template('twofaverify.html')
+    # Redirect to accounts blueprint 2FA verify handler
+    return redirect(url_for('accounts.verify_two_factor_auth'))
 
 @core_bp.route("/about/")
 def about():
@@ -117,8 +92,16 @@ def shortytable(table_html=None):
     if request.method == 'POST':
         filename = request.form.get('filename')
         if filename:
-            # load from file
-            path = '/Users/pg/proj/Shorty/-ShortyTables/' + filename
+            # load from file from user's folder
+            base = '/Users/pg/proj/Shorty/-ShortyTables'
+            username = None
+            try:
+                if current_user and getattr(current_user, 'is_authenticated', False):
+                    username = getattr(current_user, 'username', None)
+            except Exception:
+                username = None
+            folder = os.path.join(base, username) if username else base
+            path = os.path.join(folder, filename)
             try:
                 with open(path, 'r') as f:
                     html_content = f.read()
@@ -185,8 +168,16 @@ def shortyjson(table_json=None):
     if request.method == 'POST':
         filename = request.form.get('filename')
         if filename:
-            # load from file
-            path = '/Users/pg/proj/Shorty/-ShortyTables/' + filename
+            # load from user's json folder
+            base = '/Users/pg/proj/Shorty/-ShortyTables'
+            username = None
+            try:
+                if current_user and getattr(current_user, 'is_authenticated', False):
+                    username = getattr(current_user, 'username', None)
+            except Exception:
+                username = None
+            folder = os.path.join(base, username) if username else base
+            path = os.path.join(folder, filename)
             try:
                 with open(path, 'r') as f:
                     json_content = f.read()
@@ -369,7 +360,15 @@ def create_table():
     safe = re.sub(r'[^A-Za-z0-9_\- ]', '', filename).strip()
     if not safe:
         return jsonify({'error': 'Invalid filename'}), 400
-    folder = '/Users/pg/proj/Shorty/-ShortyTables'
+    base = '/Users/pg/proj/Shorty/-ShortyTables'
+    username = None
+    try:
+        if current_user and getattr(current_user, 'is_authenticated', False):
+            username = getattr(current_user, 'username', None)
+    except Exception:
+        username = None
+    folder = os.path.join(base, username) if username else base
+    os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, f"{safe}.html")
     if os.path.exists(path):
         return jsonify({'error': 'File already exists'}), 400
@@ -402,7 +401,15 @@ def create_json():
     safe = re.sub(r'[^A-Za-z0-9_\- ]', '', filename).strip()
     if not safe:
         return jsonify({'error': 'Invalid filename'}), 400
-    folder = '/Users/pg/proj/Shorty/-ShortyTables'
+    base = '/Users/pg/proj/Shorty/-ShortyTables'
+    username = None
+    try:
+        if current_user and getattr(current_user, 'is_authenticated', False):
+            username = getattr(current_user, 'username', None)
+    except Exception:
+        username = None
+    folder = os.path.join(base, username) if username else base
+    os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, f"{safe}.json")
     if os.path.exists(path):
         return jsonify({'error': 'File already exists'}), 400
@@ -413,6 +420,28 @@ def create_json():
         with open(path, 'w') as f:
             json.dump(scaffold, f, indent=4)
         return jsonify({'success': True, 'filename': f'{safe}.json', 'path': path})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/clear_table', methods=['POST'])
+@login_required
+def clear_table():
+    try:
+        session.pop('table_html', None)
+        session.pop('filenamehtml', None)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/clear_json', methods=['POST'])
+@login_required
+def clear_json():
+    try:
+        session.pop('table_json', None)
+        session.pop('filenamejson', None)
+        return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

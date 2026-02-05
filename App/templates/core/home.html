@@ -6,12 +6,20 @@ Home Page
 Shorty - Home Page
 {% endblock %}
 {% block content %}
-    <div class="main-brand" style="display: inline;"><strong>Home page</strong> for the {{ name }} Shorty (a <i>Flask</i> desktop companion)!</div>
-    <div class="main-brand" style="display: inline; float: right;">
+    <div class="main-brand" style="display: inline-block;">
+        {% if current_user.is_authenticated %}
+            <h1>Welcome back, {{ current_user.username }}!</h1>
+            <p>We're glad you're here — use the sidebar to open ShortyHTML or ShortyJSON and start editing your content.</p>
+        {% else %}
+            <h1>Welcome to Shorty</h1>
+            <p>Please sign in to access your ShortyHTML and ShortyJSON files.</p>
+        {% endif %}
+    </div>
+    <div class="main-brand" style="display: inline-block; float: right;">
         <form action="{{ url_for('accounts.logout') }}">
             <input type="submit" value="Log Out"/>
         </form>
-    </div><br/><br/>
-    <div class="main-item">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.<br/><br/>
-    Ut enim ad minim veniam, quis nostrud <i>exercitation</i> ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in <u>reprehenderit</u> in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</div>
+    </div>
+    <div style="clear: both; height: 1em;"></div>
+    <div class="main-item">Welcome to your Shorty companion — a lightweight local content manager. Use the "ShortyHTML" view to open and edit HTML datatables, or "ShortyJSON" to work with JSON-backed tables. Edits are saved back to the <code>-ShortyTables/</code> folder.</div>
 {% endblock %}

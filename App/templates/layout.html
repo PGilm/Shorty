@@ -28,7 +28,15 @@
     </head>
 
     <body class="hg">
-        <header class="hg__header">{% block header %}{% endblock %}
+        <header class="hg__header">
+            {% block header %}{% endblock %}
+            {% if current_user.is_authenticated %}
+            <div style="float:right; margin-right:1em;">
+                <form action="{{ url_for('accounts.logout') }}" method="post" style="display:inline;">
+                    <button type="submit" class="btn">Log Out</button>
+                </form>
+            </div>
+            {% endif %}
         </header>
         <main class="hg__main">
             <div class="main">
@@ -52,7 +60,7 @@
                 {% else %}
                 <a href="{{ url_for('accounts.login') }}" class="navbar-brand">Login</a>
                 {% endif %}
-                <a href="{{ url_for('shortytable') }}" class="navbar-item">ShortyTable</a>
+                <a href="{{ url_for('shortytable') }}" class="navbar-item">ShortyHTML</a>
                 <a href="{{ url_for('shortyjson') }}" class="navbar-item">ShortyJSON</a>
                 <a href="{{ url_for('core.about') }}" class="navbar-item">About</a>
                 <a href="{{ url_for('core.contact') }}" class="navbar-item">Contact</a><br/>

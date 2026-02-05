@@ -3,11 +3,15 @@
 ShortyJSON
 {% endblock %}
 {% block header %}
-<span>Shorty - {{ session["user"] }}</span>
+{% if current_user.is_authenticated %}
+    <span>{{ current_user.username }}</span>
+{% else %}
+    <span>Shorty</span>
+{% endif %}
 {% endblock %}
 {% block content %}
     <form method="post" id="json-form">
-        <button type="button" id="new-json-btn" class="btn">New JSON</button>
+        <button type="button" id="new-json-btn" class="btn">New ShortyJSON</button>
         <select name="filename" id="jsonSelect">
             <option value="">Select a JSON file</option>
         </select>
@@ -16,9 +20,11 @@ ShortyJSON
     {% if session.table_json %}
         <div>{{ session.table_json | safe }}</div>
     {% else %}
-        <div class="message">Please select a JSON file to display its content.</div>
+        <div class="message"></div>
     {% endif %}
     <script>
+        // Defensive debug flag to avoid ReferenceError when checking `debg`
+        var debg = false;
         document.addEventListener('DOMContentLoaded', function() {
             const currentFilename = "{{ session.filenamejson }}";
             const jsonSelect = document.getElementById('jsonSelect');
@@ -58,6 +64,16 @@ ShortyJSON
                 if (this.value) {
                     localStorage.setItem('lastJsonFilename', this.value);
                     this.form.submit();
+                } else {
+                    // clear displayed JSON table when empty/default option selected
+                    fetch('/clear_json', { method: 'POST' }).then(r=>r.json()).then(data=>{
+                        if (!data || data.error) { console.error('clear_json error', data); return; }
+                        localStorage.removeItem('lastJsonFilename');
+                        const msgDiv = document.querySelector('.message');
+                        if (msgDiv) msgDiv.textContent = '';
+                        const tbl = document.querySelector('table');
+                        if (tbl) tbl.remove();
+                    }).catch(e=>{ console.error('Error clearing json table:', e); });
                 }
             });
 
@@ -139,7 +155,7 @@ ShortyJSON
         document.addEventListener('click', function(event) {
             if (event.target && (event.target.id === 'copy-button' || event.target.classList.contains('smbtn-copy'))) {
                 const leftCellText = event.target.closest('td').previousElementSibling.innerText;
-                navigator.clipboard.writeText(leftCellText).then(function() { alert('Cell text copied to clipboard'); }, function(err) { console.error('Could not copy text: ', err); });
+                copyTextToClipboard(leftCellText).then(function() { alert('Cell text copied to clipboard'); }).catch(function(err) { console.error('Could not copy text: ', err); alert('Copy failed'); });
                 return;
             }
 
@@ -166,8 +182,8 @@ ShortyJSON
             }
         });
 
-        $(document).ready(function(){
-           $("html").css({"background-color":"green",
+          $(document).ready(function(){
+              $("html").css({"background-color":"green",
                  "margin-top":"0em", "margin-left":"0em",
                  "margin-right":"0em", "margin-bottom":"0em",
                  "padding":"0em", "padding-right":"0em",
@@ -183,10 +199,28 @@ ShortyJSON
                  "width":"100%",
                  "height":"100%"});
        
-            <!-- debg = true; -->
-            if (debg) {alert("JAVA SCRIPT fired");};
-            debg = false;
+            if (debg) { alert("JAVA SCRIPT fired"); }
         });
+        // clipboard helper used for copy fallback
+        function copyTextToClipboard(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                return navigator.clipboard.writeText(text);
+            }
+            return new Promise(function(resolve, reject) {
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.position = 'fixed';
+                    ta.style.left = '-9999px';
+                    document.body.appendChild(ta);
+                    ta.focus();
+                    ta.select();
+                    const ok = document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    if (ok) resolve(); else reject(new Error('execCommand copy failed'));
+                } catch (e) { reject(e); }
+            });
+        }
     
     </script>
 {% endblock %}

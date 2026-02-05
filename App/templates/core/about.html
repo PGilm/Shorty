@@ -1,10 +1,57 @@
 {% extends "layout.html" %}
 {% block title %}
-About Us
+About Shorty
 {% endblock %}
 {% block header %}
-All About Shorty
+About Shorty — Documentation & Usage
 {% endblock %}
 {% block content %}
-<strong>About page</strong> for the Visual Studio Code Flask tutorial.
+<h2>Overview</h2>
+<p>Shorty is a lightweight content manager that stores two table-like formats:</p>
+<ul>
+	<li><strong>ShortyHTML</strong>: plain HTML datatables kept under the <code>-ShortyTables/</code> folder. These files are intentionally stored with minimal markup (table structure and inner cell content only).</li>
+	<li><strong>ShortyJSON</strong>: JSON files that represent rows as objects (stored under <code>-ShortyTables/</code>). The UI renders JSON as an editable HTML table.</li>
+</ul>
+
+<h2>Key Concepts</h2>
+<ul>
+	<li><strong>Storage</strong>: Raw files are stored in <code>-ShortyTables/</code>. Saved HTML has no inline styling; rendering and layout come from app CSS.</li>
+	<li><strong>Rendering</strong>: The app applies the <code>ShortyTable</code> (render-time) CSS class to tables so they display consistently. Stored files remain unstyled so they are portable and editable by other tools.</li>
+	<li><strong>Actions</strong>: When displayed in the UI, an extra Actions column is appended with Copy / Edit / Delete buttons — this column is runtime-only and not saved to disk.</li>
+</ul>
+
+<h2>Using the UI</h2>
+<ol>
+	<li>Open <strong>ShortyHTML</strong> from the sidebar selector. Newly created items appear in the selector and open immediately.</li>
+	<li>To create a new ShortyHTML file, click <em>New ShortyHTML</em>, enter a filename (no extension) and the file will be created under <code>-ShortyTables/</code> with a one-row scaffold so you can start editing.</li>
+	<li>To create a new ShortyJSON file, use the <em>New JSON</em> button in the ShortyJSON view. A scaffolded JSON file with one empty row is created so it renders immediately.</li>
+	<li>Edit cells directly (most cells are <code>contenteditable</code>) then click the row's <em>Save</em> button to persist changes. The app strips runtime-only markup and inline styles before saving.</li>
+	<li>Use the <em>Copy</em> button to copy the left-hand cell of a row to the clipboard. Use <em>Delete</em> to remove a row (requires confirmation).</li>
+</ol>
+
+<h2>Developer Notes</h2>
+<p>Location of important files:</p>
+<ul>
+	<li>Templates: <code>App/templates/</code> (see <code>core/shortytable.html</code> and <code>core/shortyjson.html</code>).</li>
+	<li>Static CSS: <code>App/static/Shorty-style.css</code> contains presentation rules applied to the rendered tables.</li>
+	<li>Saved data: <code>-ShortyTables/</code> contains user-created files (.html &amp; .json).</li>
+	<li>Server endpoints: <code>/create_table</code>, <code>/create_json</code>, <code>/save_html</code>, and <code>/save_json</code> in <code>App/core/views.py</code>.</li>
+</ul>
+
+<h3>Styling</h3>
+<p>The app intentionally keeps saved files unstyled. Presentation is handled at render time. If you need to change layout or row heights, update <code>App/static/Shorty-style.css</code> (selectors target the runtime table class and cell divs).</p>
+
+<h3>Local Development</h3>
+<ol>
+	<li>Create and activate a virtualenv: <code>python -m venv .venv</code> then <code>source .venv/bin/activate</code>.</li>
+	<li>Install requirements: <code>pip install -r requirements.txt</code>.</li>
+	<li>Run the Flask app: <code>flask run</code> or use the existing <code>manage.py</code> entrypoint.</li>
+</ol>
+
+<h3>Notes & Best Practices</h3>
+<ul>
+	<li>Saved HTML is minimal. Avoid adding inline styles to stored files — use the app stylesheet instead.</li>
+	<li>When altering the runtime class name or behavior, update both CSS and server-side code that expects the class (see <code>App/core/views.py</code> where runtime Actions are appended).</li>
+</ul>
+
 {% endblock %}
