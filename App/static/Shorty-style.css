@@ -42,6 +42,45 @@ ol, ul {
     margin-bottom:.2em;
 }
 
+#table-form,
+#json-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35em;
+    align-items: center;
+    margin-bottom: 0.35em;
+}
+
+#table-form select,
+#json-form select {
+    min-width: 11em;
+}
+
+.md-editor-toolbar {
+    display: none;
+    flex-wrap: wrap;
+    gap: 0.25em;
+    margin: 0 0 0.4em 0;
+    padding: 0.25em;
+    border: 1px solid #315b31;
+    background-color: #d9ecd9;
+}
+
+.md-editor-toolbar.is-active {
+    display: flex;
+}
+
+.md-editor-toolbar .md-tool {
+    min-width: 3.2em;
+    padding: 0.2em 0.35em;
+    font-size: 0.85em;
+}
+
+.md-editor-toolbar .md-tool:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 table.ShortyTable { 
     table-layout: fixed;
     padding: 0em;
@@ -66,6 +105,23 @@ table.ShortyTable td {
     border: solid black 1.5px ;
 }
 
+table.ShortyTable td.shorty-cell-selected {
+    outline: 2px solid #1f6feb;
+    outline-offset: -2px;
+}
+
+table.ShortyTable td.shorty-cell-editing {
+    background-color: #fff8d2;
+}
+
+table.ShortyTable tr.shorty-row-editing td {
+    min-height: 9em;
+}
+
+table.ShortyTable tr.shorty-row-editing td div {
+    height: 9em;
+}
+
 table.ShortyTable div {
     padding: 0em;
     margin-top: 0em;
@@ -76,9 +132,56 @@ table.ShortyTable div {
     background-color: lightgray
 }
 
+table.ShortyTable.rows-double-height td div {
+    height: 9em;
+}
+
+table.ShortyTable td[data-mode="markdown"] > div {
+    background-color: #e9f3ff;
+}
+
+table.ShortyTable td[data-mode="markdown"] .shorty-md-preview p {
+    margin: 0 0 0.2em 0;
+}
+
+table.ShortyTable td[data-mode="markdown"] .shorty-md-preview ul {
+    margin: 0.2em 0;
+    padding-left: 1.1em;
+}
+
+table.ShortyTable td[data-mode="markdown"] .shorty-md-preview code {
+    background-color: #d8e8ff;
+    padding: 0 0.2em;
+}
+
+table.ShortyTable td textarea.shorty-md-editor {
+    width: 100%;
+    min-height: 9em;
+    resize: vertical;
+    border: 1px solid #5c7d5c;
+    background-color: #f8fff8;
+    box-sizing: border-box;
+    font-family: monospace;
+    font-size: 0.95em;
+    line-height: 1.35;
+    white-space: pre-wrap;
+}
+
 table.ShortyTable tr {
     width: 100%;
     vertical-align: top;
+}
+
+table.ShortyTable tbody.row-reorder-mode tr {
+    cursor: move;
+}
+
+table.ShortyTable tbody.row-reorder-mode tr.dragging-row {
+    opacity: 0.55;
+}
+
+table.ShortyTable tbody.row-reorder-mode tr:hover td {
+    background-color: #cce8cc;
 }
 
 table.ShortyTable td:nth-child(1) {

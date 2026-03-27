@@ -5,12 +5,27 @@ from App import db, bcrypt
 from flask_login import current_user, login_required, login_user, logout_user
 from flask import Blueprint, flash, redirect, render_template, request, url_for, session
 from App.core.shorty_users import generate_shorty_users
+from App.security import clear_2fa_verified, is_2fa_verified_for_session, mark_2fa_verified
 
 accounts_bp = Blueprint("accounts", __name__)
 
 HOME_URL = "core.home"
 SETUP_2FA_URL = "accounts.setup_two_factor_auth"
 VERIFY_2FA_URL = "accounts.verify_two_factor_auth"
+
+SHORTY_SESSION_KEYS = (
+    "table_html",
+    "table_json",
+    "filenamehtml",
+    "filenamejson",
+)
+
+
+def _clear_shorty_session_state(include_user=False):
+    for key in SHORTY_SESSION_KEYS:
+        session.pop(key, None)
+    if include_user:
+        session.pop("user", None)
 
 
 @accounts_bp.route("/register", methods=["GET", "POST"])
@@ -31,6 +46,8 @@ def register():
             db.session.commit()
 
             login_user(user)
+            _clear_shorty_session_state()
+            clear_2fa_verified()
             session.permanent = True
             session["user"] = user.username
             # regenerate Shorty Users files to include the new user
@@ -60,8 +77,10 @@ def login():
         pass
     if current_user.is_authenticated:
         if current_user.is_two_factor_authentication_enabled:
-            flash("You are already logged in.", "info")
-            return redirect(url_for(HOME_URL, name=current_user.username))
+            if is_2fa_verified_for_session():
+                flash("You are already logged in.", "info")
+                return redirect(url_for(HOME_URL, name=current_user.username))
+            return redirect(url_for(VERIFY_2FA_URL))
         else:
             flash(
                 "You have not enabled 2-Factor Authentication. Please enable first to login.", "info")
@@ -72,6 +91,8 @@ def login():
         user = User.query.filter_by(username=form.username.data).first()
         if user and bcrypt.check_password_hash(user.password, request.form["password"]):
             login_user(user)
+            _clear_shorty_session_state()
+            clear_2fa_verified()
             session.permanent = True
             session["user"] = user.username
             if not current_user.is_two_factor_authentication_enabled:
@@ -80,6 +101,7 @@ def login():
                 return redirect(url_for(SETUP_2FA_URL))
 
             if not current_user.device_saved == "None":
+                mark_2fa_verified()
                 flash("You previously saved this device", "success")
                 return redirect(url_for(HOME_URL, name=current_user.username))
             
@@ -94,10 +116,8 @@ def login():
 @accounts_bp.route("/logout", methods=["GET", "POST"])
 @login_required
 def logout():
-    # session.clear()
-    while session.get("user", None):
-        session.pop("user", None)
     logout_user()
+    session.clear()
     flash("You were logged out.", "success")
     return redirect(url_for("accounts.login"))
 
@@ -120,6 +140,8 @@ def verify_two_factor_auth():
         if current_user.is_otp_valid(otp_val):
             if current_user.is_two_factor_authentication_enabled:
                 flash("2FA verification successful. You are logged in!", "success")
+                _clear_shorty_session_state()
+                mark_2fa_verified()
                 session.permanent = True
                 session["user"] = current_user.username
                 if form.twoFA.data == 1 or form.twoFA.data is True:
@@ -141,6 +163,8 @@ def verify_two_factor_auth():
                     except Exception:
                         pass
                     flash("2FA setup successful. You are logged in!", "success")
+                    _clear_shorty_session_state()
+                    mark_2fa_verified()
                     session.permanent = True
                     session["user"] = current_user.username
                     if form.twoFA.data is True or form.twoFA.data == 1:

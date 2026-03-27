@@ -19,7 +19,23 @@ ShortyHTML
             <option value="">Select an HTML file</option>
         </select>
         <button type="button" id="add-row-btn" class="btn">Add Row</button>
+        <button type="button" id="toggle-cell-mode-btn" class="btn">Toggle Cell Mode</button>
+        <button type="button" id="toggle-sort-btn" class="btn">Reorder Rows</button>
+        <button type="button" id="toggle-row-height-btn" class="btn">Double Row Height</button>
     </form>
+    <div id="md-editor-toolbar" class="md-editor-toolbar" role="toolbar" aria-label="Markdown toolbar">
+        <button type="button" class="btn md-tool" data-md-action="bold" title="Bold"><strong>B</strong></button>
+        <button type="button" class="btn md-tool" data-md-action="italic" title="Italic"><em>I</em></button>
+        <button type="button" class="btn md-tool" data-md-action="h1" title="Heading 1">H1</button>
+        <button type="button" class="btn md-tool" data-md-action="h2" title="Heading 2">H2</button>
+        <button type="button" class="btn md-tool" data-md-action="h3" title="Heading 3">H3</button>
+        <button type="button" class="btn md-tool" data-md-action="ul" title="Bullet List">Bullets</button>
+        <button type="button" class="btn md-tool" data-md-action="ol" title="Numbered List">1. List</button>
+        <button type="button" class="btn md-tool" data-md-action="quote" title="Quote">Quote</button>
+        <button type="button" class="btn md-tool" data-md-action="code" title="Code">Code</button>
+        <button type="button" class="btn md-tool" data-md-action="link" title="Link">Link</button>
+        <button type="button" class="btn md-tool" data-md-action="linebreak" title="Line Break">New Line</button>
+    </div>
     {% if session.table_html %}
         <div>{{ session.table_html | safe }}</div>
     {% else %}
@@ -28,38 +44,60 @@ ShortyHTML
     <script>
         // Defensive debug flag to avoid ReferenceError when checking `debg`
         var debg = false;
+        const tableUiState = {
+            reorderMode: false,
+            doubleHeight: localStorage.getItem('shorty_html_double_height') === '1',
+            draggingRow: null,
+            selectedCell: null,
+            activeMarkdownEditor: null
+        };
+        const CELL_MODE_TEXT = 'text';
+        const CELL_MODE_MARKDOWN = 'markdown';
+        const MARKDOWN_SOURCE_B64_ATTR = 'data-md-source-b64';
+        const MARKDOWN_SOURCE_LEGACY_ATTR = 'data-md-source';
+
         document.addEventListener('DOMContentLoaded', function() {
             const currentFilename = "{{ session.filenamehtml }}";
             const tableSelect = document.getElementById('tableSelect');
 
-            // Populate the select
-            fetch('/list_tables').then(response => response.json()).then(data => {
-                if (data.error) {
-                    alert('Error: ' + data.error);
-                } else if (Array.isArray(data)) {
-                    data.forEach(f => {
-                        const option = document.createElement('option');
-                        option.value = f;
-                        option.text = f;
-                        tableSelect.appendChild(option);
-                    });
-                    // Set selected if current
-                    if (currentFilename) {
-                        const basename = currentFilename.split('/').pop();
-                        tableSelect.value = basename;
+            // Populate the selector and only auto-submit after list is loaded.
+            if (!window._shorty_list_table_fetched) {
+                window._shorty_list_table_fetched = true;
+                fetch('/list_html').then(response => response.json()).then(data => {
+                    if (data.error) {
+                        alert('Error: ' + data.error);
+                        return;
                     }
-                }
-            }).catch(error => {
-                alert('Error loading table list: ' + error);
-            });
-
-            // Auto-load last table if no current
-            if (!currentFilename) {
-                const lastTable = localStorage.getItem('lastTableFilename');
-                if (lastTable) {
-                    tableSelect.value = lastTable;
-                    tableSelect.form.submit();
-                }
+                    if (Array.isArray(data)) {
+                        data.forEach(f => {
+                            const option = document.createElement('option');
+                            option.value = f;
+                            option.text = f;
+                            tableSelect.appendChild(option);
+                        });
+                        // Set selected if current
+                        if (currentFilename) {
+                            const basename = currentFilename.split('/').pop();
+                            tableSelect.value = basename;
+                        } else {
+                            // Auto-load previously-used filename only if it
+                            // exists in the populated server-side list.
+                            const lastTable = localStorage.getItem('lastTableFilename');
+                            if (lastTable && !window._shorty_table_autosubmitted) {
+                                const exists = Array.from(tableSelect.options).some(o => o.value === lastTable);
+                                if (exists) {
+                                    window._shorty_table_autosubmitted = true;
+                                    tableSelect.value = lastTable;
+                                    tableSelect.form.submit();
+                                } else {
+                                    localStorage.removeItem('lastTableFilename');
+                                }
+                            }
+                        }
+                    }
+                }).catch(error => {
+                    alert('Error loading table list: ' + error);
+                });
             }
 
             // Handle change
@@ -74,8 +112,12 @@ ShortyHTML
                         localStorage.removeItem('lastTableFilename');
                         const msgDiv = document.querySelector('.message');
                         if (msgDiv) msgDiv.textContent = '';
+                        tableUiState.reorderMode = false;
+                        tableUiState.selectedCell = null;
+                        tableUiState.activeMarkdownEditor = null;
                         const tbl = document.querySelector('table');
                         if (tbl) tbl.remove();
+                        applyTableStyles();
                     }).catch(e=>{ console.error('Error clearing table:', e); });
                 }
             });
@@ -131,7 +173,7 @@ ShortyHTML
                 const newRow = document.createElement('tr');
                 let rowHtml = '';
                 for (let i = 0; i < numCols; i++) {
-                    rowHtml += '<td><div contenteditable="true"></div></td>';
+                    rowHtml += '<td data-mode="text"><div contenteditable="true"></div></td>';
                 }
                 rowHtml += '<td>' +
                            '<button type="button" id="copy-button" class="smbtn smbtn-copy">Copy</button>' +
@@ -147,20 +189,498 @@ ShortyHTML
                 const firstEditable = (tbody.firstChild || newRow).querySelector('div[contenteditable]');
                 if (firstEditable) firstEditable.focus();
             });
+
+            document.getElementById('toggle-sort-btn').addEventListener('click', function() {
+                const table = document.querySelector('table');
+                if (!table) { alert('No table loaded'); return; }
+                if (tableUiState.reorderMode) {
+                    tableUiState.reorderMode = false;
+                    applyTableStyles();
+                    saveCurrentTableToServer();
+                    return;
+                }
+                tableUiState.reorderMode = true;
+                applyTableStyles();
+            });
+
+            document.getElementById('toggle-row-height-btn').addEventListener('click', function() {
+                tableUiState.doubleHeight = !tableUiState.doubleHeight;
+                localStorage.setItem('shorty_html_double_height', tableUiState.doubleHeight ? '1' : '0');
+                applyTableStyles();
+            });
+
+            document.getElementById('toggle-cell-mode-btn').addEventListener('click', function() {
+                const selectedCell = tableUiState.selectedCell;
+                if (!selectedCell || !selectedCell.isConnected) {
+                    alert('Select a data cell first.');
+                    syncCellModeButton();
+                    return;
+                }
+                if (selectedCell.classList.contains('shorty-cell-editing')) {
+                    alert('Finish editing this row before changing cell mode.');
+                    return;
+                }
+                const currentMode = getCellMode(selectedCell);
+                const nextMode = currentMode === 'markdown' ? 'text' : 'markdown';
+                setCellMode(selectedCell, nextMode);
+                if (nextMode === 'markdown') {
+                    const source = extractCellPlainText(selectedCell);
+                    setMarkdownSource(selectedCell, source);
+                    renderMarkdownCell(selectedCell);
+                } else {
+                    const source = getMarkdownSource(selectedCell) || extractCellPlainText(selectedCell);
+                    clearMarkdownSource(selectedCell);
+                    selectedCell.innerHTML = '<div></div>';
+                    const div = selectedCell.querySelector('div');
+                    if (div) div.innerText = source;
+                }
+                syncCellModeButton();
+            });
+
+            const toolbar = document.getElementById('md-editor-toolbar');
+            if (toolbar) {
+                toolbar.addEventListener('click', function(event) {
+                    if (!(event.target instanceof Element)) return;
+                    const button = event.target.closest('button.md-tool');
+                    if (!button) return;
+                    const action = button.getAttribute('data-md-action');
+                    if (!action) return;
+                    event.preventDefault();
+                    applyMarkdownToolbarAction(action);
+                });
+            }
+
+            document.addEventListener('focusin', function(event) {
+                if (!(event.target instanceof Element)) return;
+                const editor = event.target.closest('textarea.shorty-md-editor');
+                if (!editor) return;
+                tableUiState.activeMarkdownEditor = editor;
+                const ownerCell = editor.closest('td');
+                if (ownerCell) setSelectedCell(ownerCell);
+                syncToolbarState();
+            });
+
+            syncTopControlLabels();
+            initializeMarkdownCells();
         });
 
         function applyTableStyles(){
             // Ensure table uses class-based styling instead of inline styles
                 const table = document.querySelector('table');
-                if (table) table.classList.add('ShortyTable');
+                if (table) {
+                    table.classList.add('ShortyTable');
+                    table.classList.toggle('rows-double-height', tableUiState.doubleHeight);
+                }
                 // Remove residual inline styles that may have been applied
                 document.querySelectorAll('table, th, td, td div, button.smbtn').forEach(el => { if (el && el.style) el.style.cssText = ''; });
+                renderMarkdownCells(document);
+                updateRowReorderState();
+                syncTopControlLabels();
+                syncCellModeButton();
+                syncToolbarState();
         }
+
+        function syncTopControlLabels() {
+            const sortButton = document.getElementById('toggle-sort-btn');
+            const rowHeightButton = document.getElementById('toggle-row-height-btn');
+            if (sortButton) {
+                sortButton.textContent = tableUiState.reorderMode ? 'Done Reordering' : 'Reorder Rows';
+            }
+            if (rowHeightButton) {
+                rowHeightButton.textContent = tableUiState.doubleHeight ? 'Normal Row Height' : 'Double Row Height';
+            }
+        }
+
+        function initializeMarkdownCells() {
+            renderMarkdownCells(document);
+            syncCellModeButton();
+            syncToolbarState();
+        }
+
+        function syncCellModeButton() {
+            const button = document.getElementById('toggle-cell-mode-btn');
+            if (!button) return;
+            const selectedCell = tableUiState.selectedCell;
+            if (!selectedCell || !selectedCell.isConnected) {
+                button.textContent = 'Toggle Cell Mode';
+                return;
+            }
+            const mode = getCellMode(selectedCell);
+            button.textContent = mode === CELL_MODE_MARKDOWN ? 'Cell Mode: Markdown' : 'Cell Mode: Text';
+        }
+
+        function isDataCell(cell) {
+            if (!(cell instanceof HTMLTableCellElement)) return false;
+            const row = cell.parentElement;
+            if (!row) return false;
+            const lastCell = row.querySelector('td:last-child');
+            if (!lastCell) return false;
+            return cell !== lastCell;
+        }
+
+        function setSelectedCell(cell) {
+            const nextCell = isDataCell(cell) ? cell : null;
+            if (tableUiState.selectedCell && tableUiState.selectedCell.isConnected) {
+                tableUiState.selectedCell.classList.remove('shorty-cell-selected');
+            }
+            tableUiState.selectedCell = nextCell;
+            if (tableUiState.selectedCell) {
+                tableUiState.selectedCell.classList.add('shorty-cell-selected');
+            }
+            syncCellModeButton();
+            syncToolbarState();
+        }
+
+        function getCellMode(cell) {
+            if (!cell) return CELL_MODE_TEXT;
+            return cell.getAttribute('data-mode') === CELL_MODE_MARKDOWN ? CELL_MODE_MARKDOWN : CELL_MODE_TEXT;
+        }
+
+        function setCellMode(cell, mode) {
+            if (!cell) return;
+            if (mode === CELL_MODE_MARKDOWN) {
+                cell.setAttribute('data-mode', CELL_MODE_MARKDOWN);
+            } else {
+                cell.setAttribute('data-mode', CELL_MODE_TEXT);
+            }
+        }
+
+        function encodeMarkdownSource(sourceText) {
+            try {
+                return btoa(unescape(encodeURIComponent(String(sourceText || ''))));
+            } catch (e) {
+                return btoa(String(sourceText || ''));
+            }
+        }
+
+        function decodeMarkdownSource(encodedValue) {
+            if (!encodedValue) return '';
+            try {
+                return decodeURIComponent(escape(atob(encodedValue)));
+            } catch (e) {
+                try {
+                    return atob(encodedValue);
+                } catch (ignored) {
+                    return '';
+                }
+            }
+        }
+
+        function setMarkdownSource(cell, sourceText) {
+            if (!cell) return;
+            cell.setAttribute(MARKDOWN_SOURCE_B64_ATTR, encodeMarkdownSource(sourceText));
+            cell.removeAttribute(MARKDOWN_SOURCE_LEGACY_ATTR);
+        }
+
+        function clearMarkdownSource(cell) {
+            if (!cell) return;
+            cell.removeAttribute(MARKDOWN_SOURCE_B64_ATTR);
+            cell.removeAttribute(MARKDOWN_SOURCE_LEGACY_ATTR);
+        }
+
+        function getMarkdownSource(cell) {
+            if (!cell) return '';
+            const sourceB64 = cell.getAttribute(MARKDOWN_SOURCE_B64_ATTR);
+            if (sourceB64) return decodeMarkdownSource(sourceB64);
+            const legacy = cell.getAttribute(MARKDOWN_SOURCE_LEGACY_ATTR);
+            if (legacy !== null) return legacy;
+            const editor = cell.querySelector('textarea.shorty-md-editor');
+            if (editor) return editor.value || '';
+            return '';
+        }
+
+        function extractCellPlainText(cell) {
+            if (!cell) return '';
+            if (getCellMode(cell) === CELL_MODE_MARKDOWN) {
+                const mdSource = getMarkdownSource(cell);
+                if (mdSource) return mdSource;
+            }
+            const div = cell.querySelector('div');
+            if (div) return div.innerText || '';
+            return cell.innerText || '';
+        }
+
+        function renderMarkdownCells(root) {
+            const scope = root || document;
+            scope.querySelectorAll('table.ShortyTable tbody tr td').forEach(cell => {
+                if (!isDataCell(cell)) return;
+                if (cell.closest('tr') && cell.closest('tr').classList.contains('shorty-row-editing')) return;
+                if (cell.querySelector('textarea.shorty-md-editor')) return;
+                if (getCellMode(cell) !== CELL_MODE_MARKDOWN) return;
+                renderMarkdownCell(cell);
+            });
+        }
+
+        function renderMarkdownCell(cell) {
+            if (!cell) return;
+            const source = getMarkdownSource(cell) || extractCellPlainText(cell);
+            setMarkdownSource(cell, source);
+            const rendered = renderMarkdownToSafeHtml(source);
+            cell.innerHTML = '<div class="shorty-md-preview">' + rendered + '</div>';
+        }
+
+        function renderMarkdownToSafeHtml(rawText) {
+            const normalized = String(rawText || '').replace(/\r\n?/g, '\n');
+            const lines = normalized.split('\n');
+            const out = [];
+            let inList = false;
+
+            lines.forEach(line => {
+                const headingMatch = line.match(/^\s*(#{1,6})\s+(.*)$/);
+                if (headingMatch) {
+                    if (inList) {
+                        out.push('</ul>');
+                        inList = false;
+                    }
+                    const level = Math.min(6, headingMatch[1].length);
+                    out.push('<h' + level + '>' + renderInlineMarkdown(headingMatch[2]) + '</h' + level + '>');
+                    return;
+                }
+
+                const listMatch = line.match(/^\s*[-*]\s+(.*)$/);
+                if (listMatch) {
+                    if (!inList) {
+                        out.push('<ul>');
+                        inList = true;
+                    }
+                    out.push('<li>' + renderInlineMarkdown(listMatch[1]) + '</li>');
+                    return;
+                }
+
+                if (inList) {
+                    out.push('</ul>');
+                    inList = false;
+                }
+
+                if (!line.trim()) {
+                    out.push('<p><br></p>');
+                } else {
+                    out.push('<p>' + renderInlineMarkdown(line) + '</p>');
+                }
+            });
+
+            if (inList) out.push('</ul>');
+            return out.join('');
+        }
+
+        function renderInlineMarkdown(textLine) {
+            let txt = escapeHtml(String(textLine || ''));
+            txt = txt.replace(/`([^`]+)`/g, '<code>$1</code>');
+            txt = txt.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+            txt = txt.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+            txt = txt.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(_, label, url) {
+                const safeUrl = sanitizeMarkdownUrl(url);
+                if (!safeUrl) return label;
+                return '<a href="' + safeUrl + '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
+            });
+            return txt;
+        }
+
+        function sanitizeMarkdownUrl(url) {
+            const candidate = String(url || '').trim();
+            if (!candidate) return '';
+            const decoder = document.createElement('textarea');
+            decoder.innerHTML = candidate;
+            const decoded = decoder.value.trim();
+            if (!/^(https?:\/\/|mailto:|\/)/i.test(decoded)) return '';
+            return encodeURI(decoded).replace(/"/g, '%22');
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function getActiveMarkdownEditor() {
+            if (tableUiState.activeMarkdownEditor && tableUiState.activeMarkdownEditor.isConnected) {
+                return tableUiState.activeMarkdownEditor;
+            }
+            const focused = document.activeElement;
+            if (focused instanceof HTMLTextAreaElement && focused.classList.contains('shorty-md-editor')) {
+                tableUiState.activeMarkdownEditor = focused;
+                return focused;
+            }
+            return null;
+        }
+
+        function syncToolbarState() {
+            const toolbar = document.getElementById('md-editor-toolbar');
+            if (!toolbar) return;
+            const activeEditor = getActiveMarkdownEditor();
+            toolbar.classList.toggle('is-active', !!activeEditor);
+            toolbar.querySelectorAll('button.md-tool').forEach(button => {
+                button.disabled = !activeEditor;
+            });
+        }
+
+        function focusEditor(editor) {
+            if (!editor) return;
+            editor.focus();
+            tableUiState.activeMarkdownEditor = editor;
+            syncToolbarState();
+        }
+
+        function insertWrapped(editor, prefix, suffix, placeholder) {
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            const selected = editor.value.slice(start, end);
+            const middle = selected || placeholder;
+            const nextValue = editor.value.slice(0, start) + prefix + middle + suffix + editor.value.slice(end);
+            editor.value = nextValue;
+            const cursorStart = start + prefix.length;
+            const cursorEnd = cursorStart + middle.length;
+            editor.setSelectionRange(cursorStart, cursorEnd);
+            focusEditor(editor);
+        }
+
+        function transformSelectedLines(editor, transformLineFn) {
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            const text = editor.value;
+            const blockStart = text.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+            let blockEnd = text.indexOf('\n', end);
+            if (blockEnd === -1) blockEnd = text.length;
+            const before = text.slice(0, blockStart);
+            const block = text.slice(blockStart, blockEnd);
+            const after = text.slice(blockEnd);
+            const transformed = block.split('\n').map(transformLineFn).join('\n');
+            editor.value = before + transformed + after;
+            editor.setSelectionRange(blockStart, blockStart + transformed.length);
+            focusEditor(editor);
+        }
+
+        function applyMarkdownToolbarAction(action) {
+            const editor = getActiveMarkdownEditor();
+            if (!editor) {
+                alert('Select a markdown cell in Edit mode first.');
+                syncToolbarState();
+                return;
+            }
+            switch (action) {
+                case 'bold':
+                    insertWrapped(editor, '**', '**', 'bold text');
+                    break;
+                case 'italic':
+                    insertWrapped(editor, '*', '*', 'italic text');
+                    break;
+                case 'h1':
+                    transformSelectedLines(editor, line => '# ' + line.replace(/^#+\s*/, ''));
+                    break;
+                case 'h2':
+                    transformSelectedLines(editor, line => '## ' + line.replace(/^#+\s*/, ''));
+                    break;
+                case 'h3':
+                    transformSelectedLines(editor, line => '### ' + line.replace(/^#+\s*/, ''));
+                    break;
+                case 'ul':
+                    transformSelectedLines(editor, line => '- ' + line.replace(/^\s*([-*]|\d+\.)\s+/, ''));
+                    break;
+                case 'ol':
+                    transformSelectedLines(editor, function(line, index) {
+                        return String(index + 1) + '. ' + line.replace(/^\s*([-*]|\d+\.)\s+/, '');
+                    });
+                    break;
+                case 'quote':
+                    transformSelectedLines(editor, line => '> ' + line.replace(/^\s*>\s?/, ''));
+                    break;
+                case 'code':
+                    if (editor.selectionStart !== editor.selectionEnd && editor.value.slice(editor.selectionStart, editor.selectionEnd).includes('\n')) {
+                        insertWrapped(editor, '```\n', '\n```', 'code');
+                    } else {
+                        insertWrapped(editor, '`', '`', 'code');
+                    }
+                    break;
+                case 'link':
+                    insertWrapped(editor, '[', '](https://)', 'link text');
+                    break;
+                case 'linebreak':
+                    insertWrapped(editor, '\n', '', '');
+                    break;
+                default:
+                    break;
+            }
+            syncToolbarState();
+        }
+
+        function updateRowReorderState() {
+            const table = document.querySelector('table');
+            const tbody = table ? table.querySelector('tbody') : null;
+            if (!tbody) {
+                tableUiState.reorderMode = false;
+                syncTopControlLabels();
+                return;
+            }
+            tbody.classList.toggle('row-reorder-mode', tableUiState.reorderMode);
+            tbody.querySelectorAll('tr').forEach(row => {
+                row.draggable = tableUiState.reorderMode;
+                row.classList.remove('dragging-row');
+            });
+        }
+
+        document.addEventListener('dragstart', function(event) {
+            if (!tableUiState.reorderMode) return;
+            if (!(event.target instanceof Element)) return;
+            const row = event.target.closest('tbody tr');
+            if (!row) return;
+            tableUiState.draggingRow = row;
+            row.classList.add('dragging-row');
+            if (event.dataTransfer) {
+                event.dataTransfer.effectAllowed = 'move';
+                // Required by Firefox to allow dragging.
+                event.dataTransfer.setData('text/plain', '');
+            }
+        });
+
+        document.addEventListener('dragover', function(event) {
+            if (!tableUiState.reorderMode || !tableUiState.draggingRow) return;
+            if (!(event.target instanceof Element)) return;
+            const tbody = event.target.closest('tbody');
+            const row = event.target.closest('tbody tr');
+            if (!tbody || !row || row === tableUiState.draggingRow) return;
+            event.preventDefault();
+            const rect = row.getBoundingClientRect();
+            const insertBefore = event.clientY < rect.top + (rect.height / 2);
+            tbody.insertBefore(tableUiState.draggingRow, insertBefore ? row : row.nextSibling);
+        });
+
+        document.addEventListener('drop', function(event) {
+            if (!tableUiState.reorderMode) return;
+            if (!(event.target instanceof Element)) return;
+            if (event.target.closest('tbody')) {
+                event.preventDefault();
+            }
+        });
+
+        document.addEventListener('dragend', function(event) {
+            if (!(event.target instanceof Element)) {
+                tableUiState.draggingRow = null;
+                return;
+            }
+            const row = event.target.closest('tbody tr');
+            if (row) row.classList.remove('dragging-row');
+            tableUiState.draggingRow = null;
+        });
 
         function saveCurrentTableToServer(){
             const table = document.querySelector('table');
             if (!table) { alert('No table to save'); return; }
             const clonedTable = table.cloneNode(true);
+            // Persist markdown source, not rendered preview markup.
+            clonedTable.querySelectorAll('td[data-mode="markdown"]').forEach(cell => {
+                const editor = cell.querySelector('textarea.shorty-md-editor');
+                const source = editor ? editor.value : (getMarkdownSource(cell) || cell.innerText || '');
+                setMarkdownSource(cell, source);
+                cell.textContent = source;
+            });
+            // Do not persist UI-only selection/edit classes.
+            clonedTable.querySelectorAll('td').forEach(cell => {
+                cell.classList.remove('shorty-cell-selected');
+                cell.classList.remove('shorty-cell-editing');
+            });
             // Remove the Actions column before sending
             const thead = clonedTable.querySelector('thead');
             if (thead) {
@@ -193,19 +713,75 @@ ShortyHTML
                 if (data) {
                     alert(data.message || 'Saved');
                     if (data.table_html) {
-                        document.querySelector('table').outerHTML = data.table_html;
+                        const renderedTable = document.querySelector('table');
+                        if (renderedTable) renderedTable.outerHTML = data.table_html;
                         applyTableStyles();
                     }
                 }
             }).catch(e=>{ alert('Error saving file: '+e) });
         }
 
+        function setRowEditMode(row, editing) {
+            if (!row) return;
+            const cells = row.querySelectorAll('td');
+            row.classList.toggle('shorty-row-editing', editing);
+            for (let i = 0; i < cells.length - 1; i++) {
+                const cell = cells[i];
+                if (editing) {
+                    if (getCellMode(cell) === CELL_MODE_MARKDOWN) {
+                        const source = getMarkdownSource(cell) || extractCellPlainText(cell);
+                        setMarkdownSource(cell, source);
+                        const editor = document.createElement('textarea');
+                        editor.className = 'shorty-md-editor';
+                        editor.value = source;
+                        cell.innerHTML = '';
+                        cell.appendChild(editor);
+                        tableUiState.activeMarkdownEditor = editor;
+                    }
+                    if (getCellMode(cell) === CELL_MODE_TEXT) {
+                        cell.contentEditable = 'true';
+                    } else {
+                        cell.contentEditable = 'false';
+                    }
+                    cell.classList.add('shorty-cell-editing');
+                } else {
+                    if (getCellMode(cell) === CELL_MODE_MARKDOWN) {
+                        const editor = cell.querySelector('textarea.shorty-md-editor');
+                        const source = editor ? editor.value : (getMarkdownSource(cell) || cell.innerText || '');
+                        setMarkdownSource(cell, source);
+                        renderMarkdownCell(cell);
+                    } else {
+                        const plain = cell.innerText || '';
+                        cell.innerHTML = '<div></div>';
+                        const div = cell.querySelector('div');
+                        if (div) div.innerText = plain;
+                    }
+                    cell.contentEditable = 'false';
+                    cell.classList.remove('shorty-cell-editing');
+                }
+            }
+            if (!editing) {
+                tableUiState.activeMarkdownEditor = null;
+            } else {
+                const firstEditor = row.querySelector('textarea.shorty-md-editor');
+                if (firstEditor) firstEditor.focus();
+            }
+            syncToolbarState();
+        }
+
         document.addEventListener('click', function(event) {
+            if (event.target instanceof Element) {
+                const selected = event.target.closest('td');
+                if (selected && isDataCell(selected)) {
+                    setSelectedCell(selected);
+                }
+            }
+
             // Copy
             if (event.target && (event.target.id === 'copy-button' || event.target.classList.contains('smbtn-copy'))) {
-                const leftCellText = event.target.closest('td').previousElementSibling.innerText;
-                copyTextToClipboard(leftCellText).then(function() {
-                    alert('Cell text copied to clipboard');
+                const sourceCell = event.target.closest('td').previousElementSibling;
+                copyCellContentToClipboard(sourceCell).then(function() {
+                    alert('Cell content copied to clipboard');
                 }).catch(function(err) {
                     console.error('Could not copy text: ', err);
                     alert('Copy failed');
@@ -216,12 +792,11 @@ ShortyHTML
             // Edit / Save
             if (event.target && (event.target.id === 'edit-button' || event.target.classList.contains('smbtn-edit'))) {
                 const row = event.target.closest('tr');
-                const cells = row.querySelectorAll('td');
                 if (event.target.innerText.trim() === 'Edit') {
-                    for (let i = 0; i < cells.length - 1; i++) cells[i].contentEditable = 'true';
+                    setRowEditMode(row, true);
                     event.target.innerText = 'Save';
                 } else {
-                    for (let i = 0; i < cells.length - 1; i++) cells[i].contentEditable = 'false';
+                    setRowEditMode(row, false);
                     event.target.innerText = 'Edit';
                     // save full table
                     saveCurrentTableToServer();
@@ -243,25 +818,101 @@ ShortyHTML
         // apply styles initially
         document.addEventListener('DOMContentLoaded', function(){ applyTableStyles(); });
 
-        // robust clipboard helper: prefer navigator.clipboard, fallback to textarea+execCommand
-        function copyTextToClipboard(text) {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                return navigator.clipboard.writeText(text);
+        function copyCellContentToClipboard(cell) {
+            if (!cell) return Promise.reject(new Error('No cell to copy'));
+
+            const mode = getCellMode(cell);
+            let plainText = '';
+            let htmlText = '';
+
+            if (mode === CELL_MODE_MARKDOWN) {
+                const markdownSource = getMarkdownSource(cell) || extractCellPlainText(cell);
+                plainText = markdownSource;
+                htmlText = '<div>' + renderMarkdownToSafeHtml(markdownSource) + '</div>';
+            } else {
+                const source = extractCellPlainText(cell);
+                plainText = source;
+                htmlText = '<div>' + escapeHtml(source).replace(/\n/g, '<br>') + '</div>';
             }
+
+            return writeRichClipboard(plainText, wrapClipboardHtml(htmlText));
+        }
+
+        async function writeRichClipboard(plainText, htmlText) {
+            if (navigator.clipboard && window.ClipboardItem) {
+                try {
+                    const clipboardItem = new ClipboardItem({
+                        'text/plain': new Blob([plainText], { type: 'text/plain' }),
+                        'text/html': new Blob([htmlText], { type: 'text/html' })
+                    });
+                    await navigator.clipboard.write([clipboardItem]);
+                    return;
+                } catch (e) {
+                    // Fallback paths below.
+                }
+            }
+
+            try {
+                await legacyRichClipboardCopy(plainText, htmlText);
+                return;
+            } catch (e) {
+                // Fallback below.
+            }
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                try {
+                    await navigator.clipboard.writeText(plainText);
+                    return;
+                } catch (e) {
+                    // Fallback below.
+                }
+            }
+
             return new Promise(function(resolve, reject) {
                 try {
                     const ta = document.createElement('textarea');
-                    ta.value = text;
-                    // avoid scrolling to bottom
+                    ta.value = plainText;
                     ta.style.position = 'fixed';
                     ta.style.left = '-9999px';
+                    ta.style.top = '0';
                     document.body.appendChild(ta);
                     ta.focus();
                     ta.select();
                     const ok = document.execCommand('copy');
                     document.body.removeChild(ta);
+
                     if (ok) resolve(); else reject(new Error('execCommand copy failed'));
-                } catch (e) { reject(e); }
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        }
+
+        function wrapClipboardHtml(contentHtml) {
+            return '<div style="background-color:transparent !important;color:inherit;">' + contentHtml + '</div>';
+        }
+
+        function legacyRichClipboardCopy(plainText, htmlText) {
+            return new Promise(function(resolve, reject) {
+                function onCopy(event) {
+                    if (!event.clipboardData) return;
+                    event.preventDefault();
+                    event.clipboardData.setData('text/plain', plainText);
+                    event.clipboardData.setData('text/html', htmlText);
+                }
+
+                document.addEventListener('copy', onCopy);
+                let ok = false;
+                try {
+                    ok = document.execCommand('copy');
+                } catch (e) {
+                    ok = false;
+                } finally {
+                    document.removeEventListener('copy', onCopy);
+                }
+
+                if (ok) resolve();
+                else reject(new Error('legacy rich copy failed'));
             });
         }
 

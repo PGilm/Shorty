@@ -16,6 +16,8 @@ ShortyJSON
             <option value="">Select a JSON file</option>
         </select>
         <button type="button" id="add-row-btn" class="btn">Add Row</button>
+        <button type="button" id="toggle-sort-btn" class="btn">Reorder Rows</button>
+        <button type="button" id="toggle-row-height-btn" class="btn">Double Row Height</button>
     </form>
     {% if session.table_json %}
         <div>{{ session.table_json | safe }}</div>
@@ -25,6 +27,12 @@ ShortyJSON
     <script>
         // Defensive debug flag to avoid ReferenceError when checking `debg`
         var debg = false;
+        const tableUiState = {
+            reorderMode: false,
+            doubleHeight: localStorage.getItem('shorty_json_double_height') === '1',
+            draggingRow: null
+        };
+
         document.addEventListener('DOMContentLoaded', function() {
             const currentFilename = "{{ session.filenamejson }}";
             const jsonSelect = document.getElementById('jsonSelect');
@@ -69,15 +77,6 @@ ShortyJSON
                 });
             }
 
-            // Auto-load last JSON if no current
-            if (!currentFilename) {
-                const lastJson = localStorage.getItem('lastJsonFilename');
-                if (lastJson) {
-                    jsonSelect.value = lastJson;
-                    jsonSelect.form.submit();
-                }
-            }
-
             // Handle change
             jsonSelect.addEventListener('change', function() {
                 if (this.value) {
@@ -90,8 +89,10 @@ ShortyJSON
                         localStorage.removeItem('lastJsonFilename');
                         const msgDiv = document.querySelector('.message');
                         if (msgDiv) msgDiv.textContent = '';
+                        tableUiState.reorderMode = false;
                         const tbl = document.querySelector('table');
                         if (tbl) tbl.remove();
+                        applyTableStyles();
                     }).catch(e=>{ console.error('Error clearing json table:', e); });
                 }
             });
@@ -142,15 +143,111 @@ ShortyJSON
                 else tbody.appendChild(newRow);
                 applyTableStyles();
             });
+
+            document.getElementById('toggle-sort-btn').addEventListener('click', function() {
+                const table = document.querySelector('table');
+                if (!table) { alert('No table loaded'); return; }
+                if (tableUiState.reorderMode) {
+                    tableUiState.reorderMode = false;
+                    applyTableStyles();
+                    saveJsonTableToServer();
+                    return;
+                }
+                tableUiState.reorderMode = true;
+                applyTableStyles();
+            });
+
+            document.getElementById('toggle-row-height-btn').addEventListener('click', function() {
+                tableUiState.doubleHeight = !tableUiState.doubleHeight;
+                localStorage.setItem('shorty_json_double_height', tableUiState.doubleHeight ? '1' : '0');
+                applyTableStyles();
+            });
+
+            applyTableStyles();
         });
 
         function applyTableStyles(){
                 // Ensure table uses class-based styling instead of inline styles
                 const table = document.querySelector('table');
-                if (table) table.classList.add('ShortyTable');
+                if (table) {
+                    table.classList.add('ShortyTable');
+                    table.classList.toggle('rows-double-height', tableUiState.doubleHeight);
+                }
                 // Remove residual inline styles that may have been applied
                 document.querySelectorAll('table, th, td, td div, button.smbtn').forEach(el => { if (el && el.style) el.style.cssText = ''; });
+                updateRowReorderState();
+                syncTopControlLabels();
         }
+
+        function syncTopControlLabels() {
+            const sortButton = document.getElementById('toggle-sort-btn');
+            const rowHeightButton = document.getElementById('toggle-row-height-btn');
+            if (sortButton) {
+                sortButton.textContent = tableUiState.reorderMode ? 'Done Reordering' : 'Reorder Rows';
+            }
+            if (rowHeightButton) {
+                rowHeightButton.textContent = tableUiState.doubleHeight ? 'Normal Row Height' : 'Double Row Height';
+            }
+        }
+
+        function updateRowReorderState() {
+            const table = document.querySelector('table');
+            const tbody = table ? table.querySelector('tbody') : null;
+            if (!tbody) {
+                tableUiState.reorderMode = false;
+                syncTopControlLabels();
+                return;
+            }
+            tbody.classList.toggle('row-reorder-mode', tableUiState.reorderMode);
+            tbody.querySelectorAll('tr').forEach(row => {
+                row.draggable = tableUiState.reorderMode;
+                row.classList.remove('dragging-row');
+            });
+        }
+
+        document.addEventListener('dragstart', function(event) {
+            if (!tableUiState.reorderMode) return;
+            if (!(event.target instanceof Element)) return;
+            const row = event.target.closest('tbody tr');
+            if (!row) return;
+            tableUiState.draggingRow = row;
+            row.classList.add('dragging-row');
+            if (event.dataTransfer) {
+                event.dataTransfer.effectAllowed = 'move';
+                // Required by Firefox to allow dragging.
+                event.dataTransfer.setData('text/plain', '');
+            }
+        });
+
+        document.addEventListener('dragover', function(event) {
+            if (!tableUiState.reorderMode || !tableUiState.draggingRow) return;
+            if (!(event.target instanceof Element)) return;
+            const tbody = event.target.closest('tbody');
+            const row = event.target.closest('tbody tr');
+            if (!tbody || !row || row === tableUiState.draggingRow) return;
+            event.preventDefault();
+            const rect = row.getBoundingClientRect();
+            const insertBefore = event.clientY < rect.top + (rect.height / 2);
+            tbody.insertBefore(tableUiState.draggingRow, insertBefore ? row : row.nextSibling);
+        });
+
+        document.addEventListener('drop', function(event) {
+            if (!tableUiState.reorderMode) return;
+            if (!(event.target instanceof Element)) return;
+            if (event.target.closest('tbody')) {
+                event.preventDefault();
+            }
+        });
+
+        document.addEventListener('dragend', function(event) {
+            if (!(event.target instanceof Element)) {
+                tableUiState.draggingRow = null;
+                return;
+            }
+            const row = event.target.closest('tbody tr');
+            if (row) row.classList.remove('dragging-row');
+            tableUiState.draggingRow = null;
+        });
 
         function saveJsonTableToServer(){
             const table = document.querySelector('table');
@@ -168,7 +265,7 @@ ShortyJSON
                 headers: {'Content-Type':'application/json'},
                 body: JSON.stringify({ json: jsonData })
             }).then(r=>{ if (r.url.includes('login')) { alert('Session expired, please log in again.'); return; } return r.json(); })
-            .then(data=>{ if (data){ alert(data.message); if (data.table_json){ document.querySelector('table').outerHTML = data.table_json; applyTableStyles(); } } }).catch(e=>alert('Error: '+e));
+            .then(data=>{ if (data){ alert(data.message); if (data.table_json){ const renderedTable = document.querySelector('table'); if (renderedTable) renderedTable.outerHTML = data.table_json; applyTableStyles(); } } }).catch(e=>alert('Error: '+e));
         }
 
         document.addEventListener('click', function(event) {

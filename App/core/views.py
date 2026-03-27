@@ -21,6 +21,7 @@ import pandas as pd
 from App.static import shortyFunc as sf
 from App.accounts.models import User
 from App import bcrypt, db
+from App.security import two_factor_verified_required
 
 
 @core_bp.route("/") # base or no route renders user-home or new-login 
@@ -88,6 +89,7 @@ def contact():
 @app.route("/shortytable/", methods=['GET', 'POST'])
 @app.route("/shortytable/<table_html>")
 @login_required
+@two_factor_verified_required
 def shortytable(table_html=None):
     if request.method == 'POST':
         filename = request.form.get('filename')
@@ -102,6 +104,9 @@ def shortytable(table_html=None):
                 username = None
             folder = os.path.join(base, username) if username else base
             path = os.path.join(folder, filename)
+            # Persist the requested path even when loading fails so the
+            # frontend does not keep auto-submitting the same stale filename.
+            session["filenamehtml"] = path
             try:
                 with open(path, 'r') as f:
                     html_content = f.read()
@@ -135,17 +140,19 @@ def shortytable(table_html=None):
 
                 else:
                     session["table_html"] = "No table found in the HTML file."
-                    #return render_template('core/shortytable.html', table_html=None)
-                    
                     return render_template(
                         'core/shortytable.html',
                         table_html=session["table_html"],
-                        filenamehtml=session["filenamehtml"]
+                        filenamehtml=session.get("filenamehtml")
                     )
                                         
             except Exception as e:
                 session["table_html"] = f"Error loading file: {e}"
-                return render_template('core/shortytable.html', table_html=None)
+                return render_template(
+                    'core/shortytable.html',
+                    table_html=session.get("table_html"),
+                    filenamehtml=session.get("filenamehtml")
+                )
         else:
             sf.get_ShortyTable()
 
@@ -164,6 +171,7 @@ def shortytable(table_html=None):
 @app.route("/shortyjson/", methods=['GET', 'POST'])
 @app.route("/shortyjson/<table_json>")
 @login_required
+@two_factor_verified_required
 def shortyjson(table_json=None):
     if request.method == 'POST':
         filename = request.form.get('filename')
@@ -233,6 +241,7 @@ def shortyjson(table_json=None):
 
 @app.route('/save_json', methods=['POST'])
 @login_required
+@two_factor_verified_required
 def save_json():
     data = request.get_json()
     json_data = data.get('json')
@@ -277,6 +286,7 @@ def save_json():
 
 @app.route('/save_html', methods=['POST'])
 @login_required
+@two_factor_verified_required
 def save_html():
     
     data = request.get_json(silent=True)
@@ -310,15 +320,24 @@ def save_html():
                 cells[-1].decompose()  # remove last cell
 
         # Strip style, id, and event attributes. Keep only the element classes
-        # and a minimal set of attributes needed for editing/display (data-field,
-        # contenteditable). This ensures the saved HTML is the barest structure
-        # similar to HTML_Template.html.
+        # and a minimal allowlist needed for editing/display (data-field,
+        # contenteditable, and markdown cell metadata).
         for tag in table.find_all(True):
             keep_attrs = {}
             if 'class' in tag.attrs:
                 keep_attrs['class'] = tag.attrs.get('class')
             if tag.name == 'td' and 'contenteditable' in tag.attrs:
                 keep_attrs['contenteditable'] = tag.attrs.get('contenteditable')
+            if tag.name == 'td':
+                mode = tag.attrs.get('data-mode')
+                if mode in ('text', 'markdown'):
+                    keep_attrs['data-mode'] = mode
+                if mode == 'markdown':
+                    if 'data-md-source-b64' in tag.attrs:
+                        keep_attrs['data-md-source-b64'] = tag.attrs.get('data-md-source-b64')
+                    elif 'data-md-source' in tag.attrs:
+                        # backward compatibility for older markdown metadata.
+                        keep_attrs['data-md-source'] = tag.attrs.get('data-md-source')
             if 'data-field' in tag.attrs:
                 keep_attrs['data-field'] = tag.attrs.get('data-field')
             tag.attrs = keep_attrs
@@ -356,6 +375,7 @@ def save_html():
 
 @app.route('/create_table', methods=['POST'])
 @login_required
+@two_factor_verified_required
 def create_table():
     data = request.get_json(silent=True)
     filename = data.get('filename') if data else None
@@ -384,8 +404,8 @@ def create_table():
             f'<table id="{safe}" class="ShortyTable">'
             '<tbody>'
             '<tr>'
-            '<td contenteditable="true"><div></div></td>'
-            '<td contenteditable="true"><div></div></td>'
+            '<td data-mode="text" contenteditable="true"><div></div></td>'
+            '<td data-mode="text" contenteditable="true"><div></div></td>'
             '</tr>'
             '</tbody></table>'
         )
@@ -398,6 +418,7 @@ def create_table():
 
 @app.route('/create_json', methods=['POST'])
 @login_required
+@two_factor_verified_required
 def create_json():
     data = request.get_json(silent=True)
     filename = data.get('filename') if data else None
@@ -431,6 +452,7 @@ def create_json():
 
 @app.route('/clear_table', methods=['POST'])
 @login_required
+@two_factor_verified_required
 def clear_table():
     try:
         session.pop('table_html', None)
@@ -442,6 +464,7 @@ def clear_table():
 
 @app.route('/clear_json', methods=['POST'])
 @login_required
+@two_factor_verified_required
 def clear_json():
     try:
         session.pop('table_json', None)

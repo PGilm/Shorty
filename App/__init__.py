@@ -6,8 +6,9 @@ from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_session import Session
 
-from flask_login import LoginManager # Add this line
+from flask_login import LoginManager, login_required # Add this line
 from datetime import timedelta
+from App.security import two_factor_verified_required
 
 app = Flask(__name__)
 app.config.from_object(config("APP_SETTINGS"))
@@ -54,24 +55,19 @@ from App.core.views import core_bp
 app.register_blueprint(accounts_bp)
 app.register_blueprint(core_bp)
 
-@app.route('/list_tables')
-def list_tables():
-    from flask import jsonify, session
+# Canonical HTML listing endpoint for ShortyHTML files.
+@app.route('/list_html')
+@login_required
+@two_factor_verified_required
+def list_html():
+    from flask import jsonify
     from flask_login import current_user
     import os
     base = '/Users/pg/proj/Shorty/-ShortyTables'
-    # prefer authenticated user's folder, fall back to session user string
-    username = None
-    try:
-        if current_user and getattr(current_user, 'is_authenticated', False):
-            username = getattr(current_user, 'username', None)
-    except Exception:
-        username = None
+    username = getattr(current_user, 'username', None)
     if not username:
-        su = session.get('user')
-        if isinstance(su, str):
-            username = su
-    folder = os.path.join(base, username) if username else base
+        return jsonify({'error': 'No authenticated username available'}), 403
+    folder = os.path.join(base, username)
     try:
         os.makedirs(folder, exist_ok=True)
         files = [f for f in os.listdir(folder) if f.endswith('.html')]
@@ -80,23 +76,18 @@ def list_tables():
         return jsonify({'error': str(e)})
 
 @app.route('/list_json')
+@login_required
+@two_factor_verified_required
 def list_json():
-    from flask import jsonify, session
+    from flask import jsonify
     from flask_login import current_user
     import os
     from flask import request as _flask_request
     base = '/Users/pg/proj/Shorty/-ShortyTables'
-    username = None
-    try:
-        if current_user and getattr(current_user, 'is_authenticated', False):
-            username = getattr(current_user, 'username', None)
-    except Exception:
-        username = None
+    username = getattr(current_user, 'username', None)
     if not username:
-        su = session.get('user')
-        if isinstance(su, str):
-            username = su
-    folder = os.path.join(base, username) if username else base
+        return jsonify({'error': 'No authenticated username available'}), 403
+    folder = os.path.join(base, username)
     try:
         # Log request for remote debugging
         app.logger.info(f"list_json called from {_flask_request.remote_addr}; folder={folder}")

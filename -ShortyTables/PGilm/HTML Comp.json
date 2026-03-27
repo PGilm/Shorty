@@ -1,10 +1,10 @@
 [
     {
-        "short_form": "Pros",
-        "long_note": "<ul><li><strong>Rich Formatting</strong>: The HTML format allows for complex and richly formatted content without additional parsing.</li><li><strong>Browser Ready</strong>: The HTML table can be directly loaded and displayed in a browser without additional processing.</li><li><strong>Ease of Use</strong>: For users who are more comfortable with HTML, it might be easier to make direct changes to the HTML content.</li></ul>"
+        "long_note": "Pros",
+        "short_form": "Rich Formatting: The HTML format allows for complex and richly formatted content without additional parsing.\nBrowser Ready: The HTML table can be directly loaded and displayed in a browser without additional processing.\nEase of Use: For users who are more comfortable with HTML, it might be easier to make direct changes to the HTML content."
     },
     {
-        "short_form": "Cons",
-        "long_note": "<ul><li><strong>Data Manipulation</strong>: Manipulating and updating data directly in an HTML file can be cumbersome and error-prone, especially when handling large datasets.</li><li><strong>Lack of Structure</strong>: HTML is not inherently structured for data storage. It lacks the simplicity and clarity of JSON for representing tabular data.</li><li><strong>Storage and Maintenance</strong>: Storing and maintaining richly formatted content within HTML files may lead to complexities, especially when trying to keep the data consistent and clean.</li></ul>"
+        "long_note": "Cons",
+        "short_form": "Data Manipulation: Manipulating and updating data directly in an HTML file can be cumbersome and error-prone, especially when handling large datasets.\nLack of Structure: HTML is not inherently structured for data storage. It lacks the simplicity and clarity of JSON for representing tabular data.\nStorage and Maintenance: Storing and maintaining richly formatted content within HTML files may lead to complexities, especially when trying to keep the data consistent and clean."
     }
 ]

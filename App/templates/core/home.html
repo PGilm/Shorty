@@ -9,7 +9,7 @@ Shorty - Home Page
     <div class="main-brand" style="display: inline-block;">
         {% if current_user.is_authenticated %}
             <h1>Welcome back, {{ current_user.username }}!</h1>
-            <p>We're glad you're here — use the sidebar to open ShortyHTML or ShortyJSON and start editing your content.</p>
+            <p>Use the sidebar to open ShortyHTML or ShortyJSON and keep your snippets organized.</p>
         {% else %}
             <h1>Welcome to Shorty</h1>
             <p>Please sign in to access your ShortyHTML and ShortyJSON files.</p>
@@ -21,5 +21,14 @@ Shorty - Home Page
         </form>
     </div>
     <div style="clear: both; height: 1em;"></div>
-    <div class="main-item">Welcome to your Shorty companion — a lightweight local content manager. Use the "ShortyHTML" view to open and edit HTML datatables, or "ShortyJSON" to work with JSON-backed tables. Edits are saved back to the <code>-ShortyTables/</code> folder.</div>
+    <div class="main-item">
+        <h3>ShortyHTML vs ShortyJSON</h3>
+        <p>Both formats work well for simple text snippets. Pick based on your next step:</p>
+        <ul>
+            <li><strong>Use ShortyJSON</strong> when your content is primarily data you want to script, transform, export, or integrate with other tools.</li>
+            <li><strong>Use ShortyHTML</strong> when your content is primarily presentation and you want HTML-ready output for browser/web display.</li>
+            <li><strong>Rule of thumb:</strong> JSON for data workflows, HTML for display workflows.</li>
+        </ul>
+        <p>All files are saved under <code>-ShortyTables/&lt;username&gt;/</code>.</p>
+    </div>
 {% endblock %}
