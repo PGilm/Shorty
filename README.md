@@ -35,10 +35,15 @@ It supports two datatable types:
 
 4. Update `.env` as needed:
 
-- `APP_SETTINGS` (usually `config.DevelopmentConfig`)
-- `SECRET_KEY`
-- `DATABASE_URL`
-- `APP_NAME`
+- `APP_SETTINGS`: choose `config.DevelopmentConfig` for local work, `config.TestingConfig` for tests, and `config.ProductionConfig` for deployed environments.
+- `SECRET_KEY`: always replace with a long random value outside local-only development.
+- `DATABASE_URL`: keep `sqlite:///db.sqlite` for single-user local usage; switch to Postgres (for example `postgresql://...`) for shared or production use.
+- `APP_NAME`: display/issuer label used in parts of the UI and 2FA metadata; change for rebranding.
+- `SHORTY_ADMIN_USERS`: comma-separated usernames that should have access to the admin page (`/admin`).
+- `FORCE_SECURE_COOKIES`: set to `1` only when traffic is HTTPS end-to-end; keep `0` for plain local HTTP.
+- `ENABLE_PROXYFIX`: keep `1` when behind nginx/ALB/reverse proxy so Flask reads forwarded host/scheme correctly; set `0` for direct local runs.
+- `FLASK_RUN_HOST` / `FLASK_RUN_PORT`: change when the app must bind to a different interface or port.
+- `FLASK_DEBUG`: keep `1` only for local debugging.
 
 ## Database Migration Commands
 

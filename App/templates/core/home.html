@@ -21,6 +21,18 @@ Shorty - Home Page
         </form>
     </div>
     <div style="clear: both; height: 1em;"></div>
+    <div class="main-item" style="margin-bottom: 1em;">
+        <h3>Shorty Storage Folder</h3>
+        <p><strong>Current folder:</strong> <code id="home-storage-current">(loading...)</code></p>
+        <p><strong>Default folder:</strong> <code id="home-storage-default">(loading...)</code></p>
+        <div style="margin-bottom: 0.4em;">
+            <button type="button" id="home-pick-folder-btn" class="btn">Choose Folder</button>
+            <button type="button" id="home-set-folder-btn" class="btn">Set Folder</button>
+            <button type="button" id="home-reset-folder-btn" class="btn">Reset to Default</button>
+        </div>
+        <input id="home-storage-input" type="text" style="min-width: 28em; max-width: 98%;" placeholder="Absolute folder path (example: /Users/name/Documents/ShortyFiles)" />
+        <p id="home-storage-status" class="message" style="margin-top:0.35em;"></p>
+    </div>
     <div class="main-item">
         <h3>ShortyHTML vs ShortyJSON</h3>
         <p>Both formats work well for simple text snippets. Pick based on your next step:</p>
@@ -29,6 +41,125 @@ Shorty - Home Page
             <li><strong>Use ShortyHTML</strong> when your content is primarily presentation and you want HTML-ready output for browser/web display.</li>
             <li><strong>Rule of thumb:</strong> JSON for data workflows, HTML for display workflows.</li>
         </ul>
-        <p>All files are saved under <code>-ShortyTables/&lt;username&gt;/</code>.</p>
+        <p>By default files are saved under <code>-ShortyTables/&lt;username&gt;/</code>, and you can switch each user's active folder at runtime from this Home page.</p>
     </div>
+    <script>
+        (function() {
+            const currentEl = document.getElementById('home-storage-current');
+            const defaultEl = document.getElementById('home-storage-default');
+            const statusEl = document.getElementById('home-storage-status');
+            const inputEl = document.getElementById('home-storage-input');
+            const pickBtn = document.getElementById('home-pick-folder-btn');
+            const setBtn = document.getElementById('home-set-folder-btn');
+            const resetBtn = document.getElementById('home-reset-folder-btn');
+
+            if (!currentEl || !defaultEl || !statusEl || !inputEl || !pickBtn || !setBtn || !resetBtn) return;
+
+            function setStatus(msg, isError) {
+                statusEl.textContent = msg || '';
+                statusEl.style.color = isError ? 'darkred' : 'darkgreen';
+            }
+
+            function updateDisplay(data) {
+                const folder = data && data.folder ? data.folder : '(unavailable)';
+                const defaultFolder = data && data.default_folder ? data.default_folder : '(unavailable)';
+                currentEl.textContent = folder;
+                defaultEl.textContent = defaultFolder;
+                currentEl.parentElement.title = folder;
+                defaultEl.parentElement.title = defaultFolder;
+                inputEl.value = folder !== '(unavailable)' ? folder : '';
+            }
+
+            function refreshFolderInfo() {
+                return fetch('/shorty_storage_folder')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (!data || data.error) {
+                            setStatus('Unable to load folder info: ' + (data && data.error ? data.error : 'unknown error'), true);
+                            return null;
+                        }
+                        updateDisplay(data);
+                        return data;
+                    })
+                    .catch(err => {
+                        setStatus('Unable to load folder info: ' + err, true);
+                        return null;
+                    });
+            }
+
+            function setFolder(folderPath) {
+                const folder = String(folderPath || '').trim();
+                if (!folder) {
+                    setStatus('Enter an absolute folder path first.', true);
+                    return;
+                }
+                fetch('/set_shorty_storage_folder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folder: folder })
+                }).then(r => r.json()).then(data => {
+                    if (!data || !data.success) {
+                        setStatus('Unable to set folder: ' + (data && data.error ? data.error : 'unknown error'), true);
+                        return;
+                    }
+                    setStatus('Folder updated.');
+                    refreshFolderInfo();
+                }).catch(err => setStatus('Unable to set folder: ' + err, true));
+            }
+
+            function promptForFolderAndSet(reasonText) {
+                const text = reasonText ? String(reasonText) + '\n' : '';
+                const entered = prompt(
+                    text + 'Enter absolute folder path for your Shorty files:',
+                    inputEl.value || ''
+                );
+                if (entered === null) return;
+                setFolder(entered);
+            }
+
+            pickBtn.addEventListener('click', function() {
+                fetch('/pick_shorty_storage_folder', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data && data.success) {
+                            setStatus('Folder updated from picker.');
+                            refreshFolderInfo();
+                            return;
+                        }
+                        if (data && data.cancelled) {
+                            setStatus('Folder picker canceled.', false);
+                            return;
+                        }
+                        const errMsg = 'Folder picker unavailable; enter a path manually.';
+                        setStatus(errMsg, true);
+                        promptForFolderAndSet(errMsg);
+                    })
+                    .catch(err => {
+                        const errMsg = 'Folder picker unavailable: ' + err;
+                        setStatus(errMsg, true);
+                        promptForFolderAndSet(errMsg);
+                    });
+            });
+
+            setBtn.addEventListener('click', function() {
+                setFolder(inputEl.value);
+            });
+
+            resetBtn.addEventListener('click', function() {
+                fetch('/reset_shorty_storage_folder', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (!data || !data.success) {
+                            setStatus('Unable to reset folder: ' + (data && data.error ? data.error : 'unknown error'), true);
+                            return;
+                        }
+                        setStatus('Folder reset to default.');
+                        refreshFolderInfo();
+                    })
+                    .catch(err => setStatus('Unable to reset folder: ' + err, true));
+            });
+
+            refreshFolderInfo();
+        })();
+    </script>
 {% endblock %}

@@ -55,14 +55,14 @@ def get_ShortyJson() -> str:
                 a.session.pop("table_json", None)
             a.session["table_json"] = str(table_json)
             a.session["filenamejson"] = file.filename
-            return a.render_template('core/shortyjson.html', table_json=a.session["table_json"])
+            return a.render_template('core/ShortyJSON.html', table_json=a.session["table_json"])
         except Exception as e:
             a.session["table_json"] = f"Error processing JSON file: {e}"
-            return a.render_template('core/shortyjson.html', table_json=a.session["table_json"])
+            return a.render_template('core/ShortyJSON.html', table_json=a.session["table_json"])
     # No uploaded file: render template from session if present, else None
     if "table_json" in a.session:
-        return a.render_template('core/shortyjson.html', table_json=a.session["table_json"])
-    return a.render_template('core/shortyjson.html', table_json=None)
+        return a.render_template('core/ShortyJSON.html', table_json=a.session["table_json"])
+    return a.render_template('core/ShortyJSON.html', table_json=None)
 
 def get_ShortyTable() -> str:
     file = a.request.files.get('file')
@@ -98,16 +98,16 @@ def get_ShortyTable() -> str:
                     a.session.pop("table_html", None)
                 a.session["table_html"] = str(table)
                 a.session["filenamehtml"] = file.filename
-                return a.render_template('core/shortytable.html', table_html=a.session["table_html"])
+                return a.render_template('core/ShortyHTML.html', table_html=a.session["table_html"])
             else:
                 a.session["table_html"] = "No table found in the HTML file."
         except Exception as e:
             a.session["table_html"] = f"Error processing file: {e}"
-            return a.render_template('core/shortytable.html', table_html=a.session.get("table_html"))
+            return a.render_template('core/ShortyHTML.html', table_html=a.session.get("table_html"))
     # No uploaded file: render template from session if present, else None
     if "table_html" in a.session:
-        return a.render_template('core/shortytable.html', table_html=a.session["table_html"])
-    return a.render_template('core/shortytable.html', table_html=None)
+        return a.render_template('core/ShortyHTML.html', table_html=a.session["table_html"])
+    return a.render_template('core/ShortyHTML.html', table_html=None)
 
 def get_port():
     if 'Microsoft' in platform.uname().release:  # "Linux" under WSL

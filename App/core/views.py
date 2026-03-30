@@ -7,6 +7,8 @@ from flask_login import LoginManager, login_user, current_user, login_required
 
 from datetime import datetime, timedelta
 import os
+import subprocess
+import sys
 from bs4 import BeautifulSoup
 from streamlit import html
 
@@ -22,6 +24,97 @@ from App.static import shortyFunc as sf
 from App.accounts.models import User
 from App import bcrypt, db
 from App.security import two_factor_verified_required
+from App.core.shorty_users import generate_shorty_users
+from App.core.storage import (
+    clear_user_shorty_folder,
+    get_user_shorty_folder,
+    get_user_shorty_folder_info,
+    set_user_shorty_folder,
+)
+import pyotp
+
+
+DEFAULT_ADMIN_USERS = {"pgilm"}
+
+
+def _is_admin_user(user_obj):
+    if not (user_obj and getattr(user_obj, "is_authenticated", False)):
+        return False
+    username = (getattr(user_obj, "username", "") or "").strip().lower()
+    raw_admin_users = os.environ.get("SHORTY_ADMIN_USERS", "")
+    allowed = set(DEFAULT_ADMIN_USERS)
+    if raw_admin_users.strip():
+        allowed = {item.strip().lower() for item in raw_admin_users.split(",") if item.strip()}
+    return username in allowed
+
+
+def _current_username():
+    try:
+        if current_user and getattr(current_user, "is_authenticated", False):
+            return getattr(current_user, "username", None)
+    except Exception:
+        return None
+    return None
+
+
+def _folder_with_filename(username, requested_name, fallback_name):
+    folder = get_user_shorty_folder(username, create=True)
+    base_name = os.path.basename(str(requested_name or fallback_name or "").strip())
+    if not base_name:
+        base_name = os.path.basename(str(fallback_name or "shorty-data"))
+    return os.path.join(folder, base_name)
+
+
+def _pick_folder_with_osascript():
+    script = [
+        "try",
+        'set chosenFolder to choose folder with prompt "Select folder for your Shorty files"',
+        "POSIX path of chosenFolder",
+        "on error number -128",
+        'return "__CANCELLED__"',
+        "end try",
+    ]
+    cmd = ["osascript"]
+    for line in script:
+        cmd.extend(["-e", line])
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    stdout = (result.stdout or "").strip()
+    stderr = (result.stderr or "").strip()
+
+    if result.returncode != 0:
+        err_l = stderr.lower()
+        if "-128" in err_l or "cancel" in err_l:
+            return None, True
+        raise RuntimeError(stderr or f"osascript exit code {result.returncode}")
+
+    if stdout == "__CANCELLED__":
+        return None, True
+    if not stdout:
+        return None, True
+    return stdout, False
+
+
+def _pick_folder_with_tkinter():
+    import tkinter as tk
+    from tkinter import filedialog
+
+    root = tk.Tk()
+    try:
+        root.withdraw()
+        try:
+            root.attributes("-topmost", True)
+        except Exception:
+            pass
+        selected = filedialog.askdirectory(title="Select folder for your Shorty files")
+    finally:
+        try:
+            root.destroy()
+        except Exception:
+            pass
+
+    if not selected:
+        return None, True
+    return selected, False
 
 
 @core_bp.route("/") # base or no route renders user-home or new-login 
@@ -86,6 +179,191 @@ def about():
 def contact():
     return render_template("core/contact.html")
 
+
+@core_bp.route("/admin/", methods=["GET", "POST"])
+@login_required
+@two_factor_verified_required
+def admin_panel():
+    if not _is_admin_user(current_user):
+        flash("Admin access is required for that page.", "danger")
+        return redirect(url_for("core.home", name=getattr(current_user, "username", "")))
+
+    if request.method == "POST":
+        action = (request.form.get("action") or "").strip()
+        user_id_raw = request.form.get("user_id")
+        try:
+            user_id = int(user_id_raw)
+        except Exception:
+            user_id = None
+        target = User.query.filter_by(id=user_id).first() if user_id is not None else None
+
+        if not target:
+            flash("User not found.", "warning")
+            return redirect(url_for("core.admin_panel"))
+
+        if action == "reset_password":
+            new_password = (request.form.get("new_password") or "").strip()
+            if len(new_password) < 6:
+                flash("Password must be at least 6 characters.", "warning")
+                return redirect(url_for("core.admin_panel"))
+            try:
+                target.password = bcrypt.generate_password_hash(new_password)
+                db.session.commit()
+                flash(f"Password reset for {target.username}.", "success")
+            except Exception:
+                db.session.rollback()
+                flash("Password reset failed.", "danger")
+            return redirect(url_for("core.admin_panel"))
+
+        if action == "reset_2fa":
+            try:
+                target.is_two_factor_authentication_enabled = False
+                target.device_saved = "None"
+                target.two_factor_secret = None
+                target.secret_token = pyotp.random_base32()
+                db.session.commit()
+                flash(f"2FA status reset for {target.username}.", "success")
+            except Exception:
+                db.session.rollback()
+                flash("2FA reset failed.", "danger")
+            return redirect(url_for("core.admin_panel"))
+
+        if action == "delete_user":
+            if target.id == current_user.id:
+                flash("You cannot delete your own active admin account.", "warning")
+                return redirect(url_for("core.admin_panel"))
+            deleted_username = target.username
+            try:
+                db.session.delete(target)
+                db.session.commit()
+                clear_user_shorty_folder(deleted_username)
+                try:
+                    generate_shorty_users()
+                except Exception:
+                    pass
+                flash(f"Deleted user {deleted_username}.", "success")
+            except Exception:
+                db.session.rollback()
+                flash("User deletion failed.", "danger")
+            return redirect(url_for("core.admin_panel"))
+
+        flash("Unknown admin action.", "warning")
+        return redirect(url_for("core.admin_panel"))
+
+    users = User.query.order_by(User.username.asc()).all()
+    user_rows = []
+    for user_obj in users:
+        folder_info = get_user_shorty_folder_info(user_obj.username)
+        user_rows.append({
+            "id": user_obj.id,
+            "username": user_obj.username,
+            "emailaddress": user_obj.emailaddress,
+            "is_two_factor_authentication_enabled": user_obj.is_two_factor_authentication_enabled,
+            "device_saved": user_obj.device_saved,
+            "created_at": user_obj.created_at,
+            "shorty_folder": folder_info.get("folder"),
+            "is_default_folder": folder_info.get("is_default"),
+        })
+    return render_template("core/admin.html", users=user_rows, admin_user=current_user)
+
+
+@app.route("/shorty_storage_folder", methods=["GET"])
+@login_required
+@two_factor_verified_required
+def get_shorty_storage_folder():
+    username = _current_username()
+    if not username:
+        return jsonify({"error": "No authenticated username available"}), 403
+    info = get_user_shorty_folder_info(username)
+    return jsonify({
+        "success": True,
+        "folder": info.get("folder"),
+        "default_folder": info.get("default_folder"),
+        "is_default": info.get("is_default"),
+    })
+
+
+@app.route("/set_shorty_storage_folder", methods=["POST"])
+@login_required
+@two_factor_verified_required
+def set_shorty_storage_folder():
+    username = _current_username()
+    if not username:
+        return jsonify({"error": "No authenticated username available"}), 403
+    payload = request.get_json(silent=True) or {}
+    requested_folder = payload.get("folder")
+    try:
+        folder = set_user_shorty_folder(username, requested_folder)
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as ex:
+        return jsonify({"error": f"Unable to set folder: {ex}"}), 500
+    session.pop("table_html", None)
+    session.pop("table_json", None)
+    session.pop("filenamehtml", None)
+    session.pop("filenamejson", None)
+    return jsonify({"success": True, "folder": folder})
+
+
+@app.route("/reset_shorty_storage_folder", methods=["POST"])
+@login_required
+@two_factor_verified_required
+def reset_shorty_storage_folder():
+    username = _current_username()
+    if not username:
+        return jsonify({"error": "No authenticated username available"}), 403
+    clear_user_shorty_folder(username)
+    info = get_user_shorty_folder_info(username)
+    session.pop("table_html", None)
+    session.pop("table_json", None)
+    session.pop("filenamehtml", None)
+    session.pop("filenamejson", None)
+    return jsonify({
+        "success": True,
+        "folder": info.get("folder"),
+        "default_folder": info.get("default_folder"),
+        "is_default": True,
+    })
+
+
+@app.route("/pick_shorty_storage_folder", methods=["POST"])
+@login_required
+@two_factor_verified_required
+def pick_shorty_storage_folder():
+    username = _current_username()
+    if not username:
+        return jsonify({"error": "No authenticated username available"}), 403
+
+    selected_folder = None
+    cancelled = False
+    picker_errors = []
+
+    try:
+        if sys.platform == "darwin":
+            selected_folder, cancelled = _pick_folder_with_osascript()
+        else:
+            selected_folder, cancelled = _pick_folder_with_tkinter()
+    except Exception as ex:
+        picker_errors.append(str(ex))
+
+    if cancelled:
+        return jsonify({"success": False, "cancelled": True})
+    if not selected_folder:
+        if picker_errors:
+            return jsonify({"error": f"Folder picker unavailable: {picker_errors[0]}"}), 500
+        return jsonify({"success": False, "cancelled": True})
+
+    try:
+        folder = set_user_shorty_folder(username, selected_folder)
+    except Exception as ex:
+        return jsonify({"error": f"Unable to set folder: {ex}"}), 500
+
+    session.pop("table_html", None)
+    session.pop("table_json", None)
+    session.pop("filenamehtml", None)
+    session.pop("filenamejson", None)
+    return jsonify({"success": True, "folder": folder})
+
 @app.route("/shortytable/", methods=['GET', 'POST'])
 @app.route("/shortytable/<table_html>")
 @login_required
@@ -94,15 +372,10 @@ def shortytable(table_html=None):
     if request.method == 'POST':
         filename = request.form.get('filename')
         if filename:
+            filename = os.path.basename(str(filename))
             # load from file from user's folder
-            base = '/Users/pg/proj/Shorty/-ShortyTables'
-            username = None
-            try:
-                if current_user and getattr(current_user, 'is_authenticated', False):
-                    username = getattr(current_user, 'username', None)
-            except Exception:
-                username = None
-            folder = os.path.join(base, username) if username else base
+            username = _current_username()
+            folder = get_user_shorty_folder(username, create=True)
             path = os.path.join(folder, filename)
             # Persist the requested path even when loading fails so the
             # frontend does not keep auto-submitting the same stale filename.
@@ -130,10 +403,10 @@ def shortytable(table_html=None):
                     session["table_html"] = str(table)
                     session["filenamehtml"] = path
                     #return render_template(
-                        # 'core/shortytable.html', 
+                        # 'core/ShortyHTML.html', 
                         # table_html=session["table_html"])
                     return render_template(
-                        'core/shortytable.html',
+                        'core/ShortyHTML.html',
                         table_html=session["table_html"],
                         filenamehtml=session["filenamehtml"]
                     )
@@ -141,7 +414,7 @@ def shortytable(table_html=None):
                 else:
                     session["table_html"] = "No table found in the HTML file."
                     return render_template(
-                        'core/shortytable.html',
+                        'core/ShortyHTML.html',
                         table_html=session["table_html"],
                         filenamehtml=session.get("filenamehtml")
                     )
@@ -149,7 +422,7 @@ def shortytable(table_html=None):
             except Exception as e:
                 session["table_html"] = f"Error loading file: {e}"
                 return render_template(
-                    'core/shortytable.html',
+                    'core/ShortyHTML.html',
                     table_html=session.get("table_html"),
                     filenamehtml=session.get("filenamehtml")
                 )
@@ -158,12 +431,12 @@ def shortytable(table_html=None):
 
     if "table_html" in session:
         return render_template(
-            "core/shortytable.html",
+            "core/ShortyHTML.html",
             table_html = session["table_html"],
             filenamehtml = session.get("filenamehtml")
         )
     return render_template(
-        'core/shortytable.html',
+        'core/ShortyHTML.html',
         table_html = None,
         filenamehtml = session.get("filenamehtml")
         )
@@ -176,15 +449,10 @@ def shortyjson(table_json=None):
     if request.method == 'POST':
         filename = request.form.get('filename')
         if filename:
+            filename = os.path.basename(str(filename))
             # load from user's json folder
-            base = '/Users/pg/proj/Shorty/-ShortyTables'
-            username = None
-            try:
-                if current_user and getattr(current_user, 'is_authenticated', False):
-                    username = getattr(current_user, 'username', None)
-            except Exception:
-                username = None
-            folder = os.path.join(base, username) if username else base
+            username = _current_username()
+            folder = get_user_shorty_folder(username, create=True)
             path = os.path.join(folder, filename)
             try:
                 # remember which filename the user requested so the client-side
@@ -217,25 +485,25 @@ def shortyjson(table_json=None):
                     table_json += '</tbody></table>'
                     session["table_json"] = table_json
                     session["filenamejson"] = path
-                    return render_template('core/shortyjson.html', table_json=session["table_json"])
+                    return render_template('core/ShortyJSON.html', table_json=session["table_json"])
                 else:
                     session["table_json"] = "Invalid JSON format or empty data."
-                    return render_template('core/shortyjson.html', table_json=None)
+                    return render_template('core/ShortyJSON.html', table_json=None)
             except Exception as e:
                 # ensure filename is persisted so client won't endlessly re-submit
                 session["filenamejson"] = path
                 session["table_json"] = f"Error loading file: {e}"
-                return render_template('core/shortyjson.html', table_json=session.get("table_json"))
+                return render_template('core/ShortyJSON.html', table_json=session.get("table_json"))
         else:
             sf.get_ShortyJson()
 
     if "table_json" in session:
         return render_template(
-            "core/shortyjson.html",
+            "core/ShortyJSON.html",
             table_json = session["table_json"]
         )
     return render_template(
-        'core/shortyjson.html',
+        'core/ShortyJSON.html',
         table_json = None
         )
 
@@ -245,12 +513,10 @@ def shortyjson(table_json=None):
 def save_json():
     data = request.get_json()
     json_data = data.get('json')
-    path = data.get('path')
-    if path:
-        filename = path
-        session['filenamejson'] = path
-    else:
-        filename = session.get('filenamejson', 'data.json')
+    requested_path = data.get('path')
+    username = _current_username()
+    filename = _folder_with_filename(username, requested_path or session.get('filenamejson'), 'data.json')
+    session['filenamejson'] = filename
     try:
         with open(filename, 'w') as file:
             json.dump(json_data, file, indent=4)
@@ -296,14 +562,16 @@ def save_html():
     html = data.get("html")
     path = data.get("path")
 
-    if not html or not path:
-        return jsonify({"error": "Missing html or path"}), 400
+    if not html:
+        return jsonify({"error": "Missing html payload"}), 400
     
     html_content = data.get('html')
-    path = data.get('path')
+    username = _current_username()
+    path = _folder_with_filename(username, path or session.get("filenamehtml"), "shorty.html")
+    session["filenamehtml"] = path
 
-    if not html_content or not path:
-        return jsonify({'message': 'Missing html or path'}), 400
+    if not html_content:
+        return jsonify({'message': 'Missing html payload'}), 400
 
     try:
         # Parse HTML
@@ -385,14 +653,8 @@ def create_table():
     safe = re.sub(r'[^A-Za-z0-9_\- ]', '', filename).strip()
     if not safe:
         return jsonify({'error': 'Invalid filename'}), 400
-    base = '/Users/pg/proj/Shorty/-ShortyTables'
-    username = None
-    try:
-        if current_user and getattr(current_user, 'is_authenticated', False):
-            username = getattr(current_user, 'username', None)
-    except Exception:
-        username = None
-    folder = os.path.join(base, username) if username else base
+    username = _current_username()
+    folder = get_user_shorty_folder(username, create=True)
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, f"{safe}.html")
     if os.path.exists(path):
@@ -427,14 +689,8 @@ def create_json():
     safe = re.sub(r'[^A-Za-z0-9_\- ]', '', filename).strip()
     if not safe:
         return jsonify({'error': 'Invalid filename'}), 400
-    base = '/Users/pg/proj/Shorty/-ShortyTables'
-    username = None
-    try:
-        if current_user and getattr(current_user, 'is_authenticated', False):
-            username = getattr(current_user, 'username', None)
-    except Exception:
-        username = None
-    folder = os.path.join(base, username) if username else base
+    username = _current_username()
+    folder = get_user_shorty_folder(username, create=True)
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, f"{safe}.json")
     if os.path.exists(path):

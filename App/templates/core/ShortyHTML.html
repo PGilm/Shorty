@@ -14,14 +14,20 @@ ShortyHTML
     <input type="hidden" id="file-path" value="{{ filenamehtml }}">
 
     <form method="post" id="table-form">
-        <button type="button" id="new-table-btn" class="btn">New ShortyHTML</button>
         <select name="filename" id="tableSelect">
             <option value="">Select an HTML file</option>
+            <option value="__new_html__">&lt;New HTML&gt;</option>
         </select>
         <button type="button" id="add-row-btn" class="btn">Add Row</button>
         <button type="button" id="toggle-cell-mode-btn" class="btn">Toggle Cell Mode</button>
         <button type="button" id="toggle-sort-btn" class="btn">Reorder Rows</button>
         <button type="button" id="toggle-row-height-btn" class="btn">Double Row Height</button>
+        <div class="font-controls" aria-label="Table font size controls">
+            <button type="button" id="decrease-font-btn" class="btn font-btn" title="Decrease table font size">A-</button>
+            <button type="button" id="increase-font-btn" class="btn font-btn" title="Increase table font size">A+</button>
+            <button type="button" id="reset-font-btn" class="btn font-btn" title="Reset table font size">A</button>
+            <span id="table-font-label" class="font-label" aria-live="polite">Font 90%</span>
+        </div>
     </form>
     <div id="md-editor-toolbar" class="md-editor-toolbar" role="toolbar" aria-label="Markdown toolbar">
         <button type="button" class="btn md-tool" data-md-action="bold" title="Bold"><strong>B</strong></button>
@@ -44,9 +50,17 @@ ShortyHTML
     <script>
         // Defensive debug flag to avoid ReferenceError when checking `debg`
         var debg = false;
+        const NEW_TABLE_OPTION_VALUE = '__new_html__';
+        const HTML_FONT_SCALE_STORAGE_KEY = 'shorty_html_font_scale';
+        const DEFAULT_TABLE_FONT_SCALE = 0.90;
+        const FONT_SCALE_STEP = 0.05;
+        const MIN_TABLE_FONT_SCALE = 0.70;
+        const MAX_TABLE_FONT_SCALE = 1.40;
+
         const tableUiState = {
             reorderMode: false,
             doubleHeight: localStorage.getItem('shorty_html_double_height') === '1',
+            fontScale: loadPersistedTableFontScale(),
             draggingRow: null,
             selectedCell: null,
             activeMarkdownEditor: null
@@ -77,8 +91,9 @@ ShortyHTML
                         });
                         // Set selected if current
                         if (currentFilename) {
-                            const basename = currentFilename.split('/').pop();
+                            const basename = currentFilename.split(/[\\/]/).pop();
                             tableSelect.value = basename;
+                            localStorage.setItem('lastTableFilename', basename);
                         } else {
                             // Auto-load previously-used filename only if it
                             // exists in the populated server-side list.
@@ -102,6 +117,10 @@ ShortyHTML
 
             // Handle change
             tableSelect.addEventListener('change', function() {
+                if (this.value === NEW_TABLE_OPTION_VALUE) {
+                    createNewHtmlTableFromSelect(tableSelect);
+                    return;
+                }
                 if (this.value) {
                     localStorage.setItem('lastTableFilename', this.value);
                     this.form.submit();
@@ -122,31 +141,22 @@ ShortyHTML
                 }
             });
 
-            // New Table button
-            document.getElementById('new-table-btn').addEventListener('click', function(){
-                const name = prompt('New HTML table filename (no extension):');
-                if (!name) return;
-                fetch('/create_table', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ filename: name })
-                }).then(r=>r.json()).then(data=>{
-                    if (data && data.success) {
-                        // add the new file to the selector, select it and submit to load
-                        let opt = Array.from(tableSelect.options).find(o => o.value === data.filename);
-                        if (!opt) {
-                            opt = document.createElement('option');
-                            opt.value = data.filename;
-                            opt.text = data.filename;
-                            tableSelect.appendChild(opt);
-                        }
-                        tableSelect.value = data.filename;
-                        localStorage.setItem('lastTableFilename', data.filename);
-                        tableSelect.form.submit();
-                    } else {
-                        alert('Error creating file: ' + (data.error || 'unknown'));
-                    }
-                }).catch(e=>{alert('Error: '+e)});
+            document.getElementById('decrease-font-btn').addEventListener('click', function() {
+                tableUiState.fontScale = clampTableFontScale(tableUiState.fontScale - FONT_SCALE_STEP);
+                localStorage.setItem(HTML_FONT_SCALE_STORAGE_KEY, String(tableUiState.fontScale));
+                applyTableStyles();
+            });
+
+            document.getElementById('increase-font-btn').addEventListener('click', function() {
+                tableUiState.fontScale = clampTableFontScale(tableUiState.fontScale + FONT_SCALE_STEP);
+                localStorage.setItem(HTML_FONT_SCALE_STORAGE_KEY, String(tableUiState.fontScale));
+                applyTableStyles();
+            });
+
+            document.getElementById('reset-font-btn').addEventListener('click', function() {
+                tableUiState.fontScale = DEFAULT_TABLE_FONT_SCALE;
+                localStorage.setItem(HTML_FONT_SCALE_STORAGE_KEY, String(tableUiState.fontScale));
+                applyTableStyles();
             });
 
             // Add Row button: add an editable blank row at top
@@ -264,6 +274,60 @@ ShortyHTML
             initializeMarkdownCells();
         });
 
+        function clampTableFontScale(value) {
+            if (!Number.isFinite(value)) return DEFAULT_TABLE_FONT_SCALE;
+            const rounded = Math.round(value * 100) / 100;
+            return Math.min(MAX_TABLE_FONT_SCALE, Math.max(MIN_TABLE_FONT_SCALE, rounded));
+        }
+
+        function loadPersistedTableFontScale() {
+            const persisted = parseFloat(localStorage.getItem(HTML_FONT_SCALE_STORAGE_KEY) || '');
+            if (!Number.isFinite(persisted)) return DEFAULT_TABLE_FONT_SCALE;
+            return clampTableFontScale(persisted);
+        }
+
+        function formatFontScale(scale) {
+            return String(Math.round(scale * 100)) + '%';
+        }
+
+        function restoreTableSelection(tableSelect, fallbackValue) {
+            const hasFallback = fallbackValue && Array.from(tableSelect.options).some(o => o.value === fallbackValue);
+            tableSelect.value = hasFallback ? fallbackValue : '';
+        }
+
+        function createNewHtmlTableFromSelect(tableSelect) {
+            const fallback = localStorage.getItem('lastTableFilename') || '';
+            const name = prompt('New HTML table filename (no extension):');
+            if (!name) {
+                restoreTableSelection(tableSelect, fallback);
+                return;
+            }
+            fetch('/create_table', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: name })
+            }).then(r=>r.json()).then(data=>{
+                if (data && data.success) {
+                    let opt = Array.from(tableSelect.options).find(o => o.value === data.filename);
+                    if (!opt) {
+                        opt = document.createElement('option');
+                        opt.value = data.filename;
+                        opt.text = data.filename;
+                        tableSelect.appendChild(opt);
+                    }
+                    tableSelect.value = data.filename;
+                    localStorage.setItem('lastTableFilename', data.filename);
+                    tableSelect.form.submit();
+                } else {
+                    restoreTableSelection(tableSelect, fallback);
+                    alert('Error creating file: ' + (data.error || 'unknown'));
+                }
+            }).catch(e=>{
+                restoreTableSelection(tableSelect, fallback);
+                alert('Error: '+e);
+            });
+        }
+
         function applyTableStyles(){
             // Ensure table uses class-based styling instead of inline styles
                 const table = document.querySelector('table');
@@ -273,6 +337,9 @@ ShortyHTML
                 }
                 // Remove residual inline styles that may have been applied
                 document.querySelectorAll('table, th, td, td div, button.smbtn').forEach(el => { if (el && el.style) el.style.cssText = ''; });
+                if (table) {
+                    table.style.setProperty('--shorty-table-font-size', tableUiState.fontScale.toFixed(2) + 'em');
+                }
                 renderMarkdownCells(document);
                 updateRowReorderState();
                 syncTopControlLabels();
@@ -283,11 +350,15 @@ ShortyHTML
         function syncTopControlLabels() {
             const sortButton = document.getElementById('toggle-sort-btn');
             const rowHeightButton = document.getElementById('toggle-row-height-btn');
+            const fontLabel = document.getElementById('table-font-label');
             if (sortButton) {
                 sortButton.textContent = tableUiState.reorderMode ? 'Done Reordering' : 'Reorder Rows';
             }
             if (rowHeightButton) {
                 rowHeightButton.textContent = tableUiState.doubleHeight ? 'Normal Row Height' : 'Double Row Height';
+            }
+            if (fontLabel) {
+                fontLabel.textContent = 'Font ' + formatFontScale(tableUiState.fontScale);
             }
         }
 

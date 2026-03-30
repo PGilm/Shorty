@@ -48,6 +48,27 @@ bcrypt = Bcrypt(app)
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
+
+@app.context_processor
+def inject_shorty_header_metadata():
+    from flask import session
+    from flask_login import current_user
+
+    header_shorty_filename = ""
+
+    try:
+        if current_user and getattr(current_user, "is_authenticated", False):
+            active_path = session.get("filenamehtml") or session.get("filenamejson")
+            if active_path:
+                header_shorty_filename = os.path.basename(str(active_path))
+    except Exception:
+        # Keep header rendering resilient.
+        header_shorty_filename = ""
+
+    return {
+        "header_shorty_filename": header_shorty_filename,
+    }
+
 # Registering blueprints
 from App.accounts.views import accounts_bp
 from App.core.views import core_bp
@@ -62,15 +83,12 @@ app.register_blueprint(core_bp)
 def list_html():
     from flask import jsonify
     from flask_login import current_user
-    import os
-    base = '/Users/pg/proj/Shorty/-ShortyTables'
+    from App.core.storage import list_user_shorty_files
     username = getattr(current_user, 'username', None)
     if not username:
         return jsonify({'error': 'No authenticated username available'}), 403
-    folder = os.path.join(base, username)
     try:
-        os.makedirs(folder, exist_ok=True)
-        files = [f for f in os.listdir(folder) if f.endswith('.html')]
+        files = list_user_shorty_files(username, '.html')
         return jsonify(files)
     except Exception as e:
         return jsonify({'error': str(e)})
@@ -81,18 +99,16 @@ def list_html():
 def list_json():
     from flask import jsonify
     from flask_login import current_user
-    import os
+    from App.core.storage import get_user_shorty_folder, list_user_shorty_files
     from flask import request as _flask_request
-    base = '/Users/pg/proj/Shorty/-ShortyTables'
     username = getattr(current_user, 'username', None)
     if not username:
         return jsonify({'error': 'No authenticated username available'}), 403
-    folder = os.path.join(base, username)
     try:
+        folder = get_user_shorty_folder(username, create=True)
         # Log request for remote debugging
         app.logger.info(f"list_json called from {_flask_request.remote_addr}; folder={folder}")
-        os.makedirs(folder, exist_ok=True)
-        files = [f for f in os.listdir(folder) if f.endswith('.json')]
+        files = list_user_shorty_files(username, '.json')
         return jsonify(files)
     except Exception as e:
         app.logger.exception("Error in list_json")

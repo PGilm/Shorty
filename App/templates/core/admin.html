@@ -1,0 +1,80 @@
+{% extends "layout.html" %}
+{% block title %}
+Admin
+{% endblock %}
+{% block header %}
+Admin Console
+{% endblock %}
+{% block content %}
+<h2>User Administration</h2>
+<p>Use this page to reset passwords, reset 2FA state, or delete users.</p>
+<style>
+    table.admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9em;
+        background-color: #d8efd8;
+    }
+    table.admin-table th,
+    table.admin-table td {
+        border: 1px solid #315b31;
+        padding: 0.35em;
+        vertical-align: top;
+    }
+    table.admin-table thead th {
+        background-color: #a7d7a7;
+        color: #102e10;
+        text-align: left;
+    }
+</style>
+<div style="overflow-x:auto;">
+    <table class="admin-table" style="min-width: 980px;">
+        <thead>
+            <tr>
+                <th><div>User</div></th>
+                <th><div>Email</div></th>
+                <th><div>2FA Enabled</div></th>
+                <th><div>Device Saved</div></th>
+                <th><div>Created</div></th>
+                <th><div>Shorty Folder</div></th>
+                <th><div>Actions</div></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in users %}
+            <tr>
+                <td><div>{{ row.username }}</div></td>
+                <td><div>{{ row.emailaddress }}</div></td>
+                <td><div>{{ "Yes" if row.is_two_factor_authentication_enabled else "No" }}</div></td>
+                <td><div>{{ row.device_saved or "None" }}</div></td>
+                <td><div>{{ row.created_at.strftime('%Y-%m-%d %H:%M') if row.created_at else "" }}</div></td>
+                <td>
+                    <div title="{{ row.shorty_folder }}">
+                        {{ row.shorty_folder }}
+                        {% if row.is_default_folder %}(default){% endif %}
+                    </div>
+                </td>
+                <td style="background-color:#194d19; min-width: 16em;">
+                    <form method="post" style="display:block; margin-bottom:0.4em;">
+                        <input type="hidden" name="action" value="reset_password">
+                        <input type="hidden" name="user_id" value="{{ row.id }}">
+                        <input type="password" name="new_password" minlength="6" placeholder="New password" required style="width:98%; margin-bottom:0.2em;">
+                        <button type="submit" class="btn smbtn smbtn-edit" style="height:auto;">Reset Password</button>
+                    </form>
+                    <form method="post" style="display:block; margin-bottom:0.4em;">
+                        <input type="hidden" name="action" value="reset_2fa">
+                        <input type="hidden" name="user_id" value="{{ row.id }}">
+                        <button type="submit" class="btn smbtn smbtn-copy" style="height:auto;">Reset 2FA</button>
+                    </form>
+                    <form method="post" style="display:block;" onsubmit="return confirm('Delete user {{ row.username }}? This cannot be undone.');">
+                        <input type="hidden" name="action" value="delete_user">
+                        <input type="hidden" name="user_id" value="{{ row.id }}">
+                        <button type="submit" class="btn smbtn smbtn-delete" style="height:auto;">Delete User</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

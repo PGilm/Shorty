@@ -71,13 +71,45 @@
 }
 
 .hg__header { grid-area: header; 
-			  font-size: 1.2em;
+			  font-size: 1.1em;
 			  font-weight: 600;
 			  color: yellow;
-			  text-align: center;
-			  padding: 2px 0px 0px 0px;
+			  text-align: left;
+			  padding: 2px 6px 0px 6px;
 			  background-color: darkgreen;
-		}
+			  position: relative;
+				}
+
+.shorty-header-line {
+			  display: flex;
+			  align-items: center;
+			  justify-content: space-between;
+			  gap: 0.8em;
+			  padding-right: 6.4em;
+			}
+
+.shorty-header-left {
+			  min-width: 0;
+			}
+
+.shorty-header-file {
+			  margin-left: auto;
+			  min-width: 0;
+			  max-width: 55%;
+			  font-size: 0.62em;
+			  font-weight: 500;
+			  color: #e5f8ce;
+			  white-space: nowrap;
+			  overflow: hidden;
+			  text-overflow: ellipsis;
+			  text-align: right;
+			}
+
+.shorty-header-logout {
+			  position: absolute;
+			  right: 0.5em;
+			  top: 1px;
+			}
 
 .hg__footer { grid-area: footer; 
 			  background-color: darkseagreen;
@@ -105,7 +137,7 @@
 	                     " nav    main   app"
 	                     "footer footer footer";
 	grid-template-columns: 110px 1fr 110px;
-	grid-template-rows: 30px
+	grid-template-rows: 40px
 						1fr
 						50px;
 	background-color: orange;
@@ -117,17 +149,17 @@
 	}
 
 @media only screen and (max-width: 600px) {
-	.hg {
-		grid-template-areas: "header"
-		                     "nav"
-		                     "main"
-		                     "app"
-		                     "footer";
-		grid-template-columns: 100%;
-		grid-template-rows: 30px
-							max-content
-							1fr
-							max-content
+		.hg {
+			grid-template-areas: "header"
+			                     "nav"
+			                     "main"
+			                     "app"
+			                     "footer";
+			grid-template-columns: 100%;
+			grid-template-rows: 40px
+								max-content
+								1fr
+								max-content
 							50px;
 	}
 

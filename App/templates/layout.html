@@ -29,9 +29,16 @@
 
     <body class="hg">
         <header class="hg__header">
-            {% block header %}{% endblock %}
+            <div class="shorty-header-line">
+                <div class="shorty-header-left">{% block header %}{% endblock %}</div>
+                {% if current_user.is_authenticated %}
+                <div class="shorty-header-file" title="{{ header_shorty_filename or '(none)' }}">
+                    File: {{ header_shorty_filename or "(none)" }}
+                </div>
+                {% endif %}
+            </div>
             {% if current_user.is_authenticated %}
-            <div style="float:right; margin-right:1em;">
+            <div class="shorty-header-logout">
                 <form action="{{ url_for('accounts.logout') }}" method="post" style="display:inline;">
                     <button type="submit" class="btn">Log Out</button>
                 </form>
@@ -63,7 +70,7 @@
                 <a href="{{ url_for('shortytable') }}" class="navbar-item">ShortyHTML</a>
                 <a href="{{ url_for('shortyjson') }}" class="navbar-item">ShortyJSON</a>
                 <a href="{{ url_for('core.about') }}" class="navbar-item">About</a>
-                <a href="{{ url_for('core.contact') }}" class="navbar-item">Contact</a><br/>
+                <a href="{{ url_for('core.contact') }}" class="navbar-item">Contact</a>
             </div>
         </aside>
         <aside class="hg__right">
@@ -74,9 +81,8 @@
                 <span class=appbar-item>Number 3</span>
                 <span class=appbar-item>Number 4</span>
                 <span class=appbar-brand>Other</span>
-                <span class=appbar-item>Number 5</span>
+                <a href="{{ url_for('core.admin_panel') }}" class="appbar-item">Admin</a>
                 <span class=appbar-item>Number 6</span>
-                <br/>
             </div>
         </aside>
         <footer class="hg__footer">

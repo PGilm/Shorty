@@ -9,8 +9,8 @@ About Shorty — Documentation & Usage
 <h2>Overview</h2>
 <p>Shorty is a lightweight content manager with two table formats:</p>
 <ul>
-	<li><strong>ShortyHTML</strong>: HTML tables stored as minimal markup under <code>-ShortyTables/&lt;username&gt;/</code>.</li>
-	<li><strong>ShortyJSON</strong>: JSON arrays of row objects stored under <code>-ShortyTables/&lt;username&gt;/</code>.</li>
+	<li><strong>ShortyHTML</strong>: HTML tables stored as minimal markup in your selected user storage folder (default is <code>-ShortyTables/&lt;username&gt;/</code>).</li>
+	<li><strong>ShortyJSON</strong>: JSON arrays of row objects stored in your selected user storage folder (default is <code>-ShortyTables/&lt;username&gt;/</code>).</li>
 </ul>
 
 <h2>Which Format Should I Use?</h2>
@@ -23,7 +23,7 @@ About Shorty — Documentation & Usage
 
 <h2>Key Concepts</h2>
 <ul>
-	<li><strong>Storage</strong>: Files are stored per user in <code>-ShortyTables/&lt;username&gt;/</code>.</li>
+	<li><strong>Storage</strong>: Files are stored per user in a runtime-selectable folder. Default path is <code>-ShortyTables/&lt;username&gt;/</code>.</li>
 	<li><strong>Separation of concerns</strong>: Shorty keeps stored HTML lean and applies UI styling at render time.</li>
 	<li><strong>Rendering</strong>: The app applies the <code>ShortyTable</code> (render-time) CSS class to tables so they display consistently. Stored files remain unstyled so they are portable and editable by other tools.</li>
 	<li><strong>Actions</strong>: When displayed in the UI, an extra Actions column is appended with Copy / Edit / Delete buttons — this column is runtime-only and not saved to disk.</li>
@@ -31,11 +31,11 @@ About Shorty — Documentation & Usage
 
 <h2>Using the UI</h2>
 <ol>
-	<li>Open <strong>ShortyHTML</strong> from the sidebar selector. Newly created items appear in the selector and open immediately.</li>
-	<li>To create a new ShortyHTML file, click <em>New ShortyHTML</em>, enter a filename (no extension) and the file will be created under <code>-ShortyTables/</code> with a one-row scaffold so you can start editing.</li>
-	<li>To create a new ShortyJSON file, use the <em>New JSON</em> button in the ShortyJSON view. A scaffolded JSON file with one empty row is created so it renders immediately.</li>
-	<li>Edit cells directly (most cells are <code>contenteditable</code>) then click the row's <em>Save</em> button to persist changes. The app strips runtime-only markup and inline styles before saving.</li>
-	<li>Use the <em>Copy</em> button to copy the left-hand cell of a row to the clipboard. Use <em>Delete</em> to remove a row (requires confirmation).</li>
+		<li>Open <strong>ShortyHTML</strong> from the sidebar selector. Newly created items appear in the selector and open immediately.</li>
+		<li>To create a new ShortyHTML or ShortyJSON file, choose <em>&lt;New HTML&gt;</em> or <em>&lt;New JSON&gt;</em> in the file selector and enter a filename.</li>
+		<li>Use the Home page storage controls to choose or reset the active folder for your current user during runtime.</li>
+		<li>Edit cells directly (most cells are <code>contenteditable</code>) then click the row's <em>Save</em> button to persist changes. The app strips runtime-only markup and inline styles before saving.</li>
+		<li>Use the <em>Copy</em> button to copy the left-hand cell of a row to the clipboard. Use <em>Delete</em> to remove a row (requires confirmation).</li>
 </ol>
 
 <h2>Rich Content in ShortyHTML (Images, Video, Markdown)</h2>
@@ -54,9 +54,9 @@ About Shorty — Documentation & Usage
 <h2>Developer Notes</h2>
 <p>Location of important files:</p>
 <ul>
-	<li>Templates: <code>App/templates/</code> (see <code>core/shortytable.html</code> and <code>core/shortyjson.html</code>).</li>
+	<li>Templates: <code>App/templates/</code> (see <code>core/ShortyHTML.html</code> and <code>core/ShortyJSON.html</code>).</li>
 	<li>Static CSS: <code>App/static/Shorty-style.css</code> contains presentation rules applied to the rendered tables.</li>
-	<li>Saved data: <code>-ShortyTables/&lt;username&gt;/</code> contains user-created files (.html &amp; .json).</li>
+	<li>Saved data: each user has a selected storage folder; default is <code>-ShortyTables/&lt;username&gt;/</code> for .html and .json files.</li>
 	<li>Server endpoints: <code>/create_table</code>, <code>/create_json</code>, <code>/save_html</code>, and <code>/save_json</code> in <code>App/core/views.py</code>.</li>
 	<li>List endpoints: <code>/list_html</code> for ShortyHTML files and <code>/list_json</code> for ShortyJSON files.</li>
 </ul>
