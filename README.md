@@ -40,6 +40,7 @@ It supports two datatable types:
 - `DATABASE_URL`: keep `sqlite:///db.sqlite` for single-user local usage; switch to Postgres (for example `postgresql://...`) for shared or production use.
 - `APP_NAME`: display/issuer label used in parts of the UI and 2FA metadata; change for rebranding.
 - `SHORTY_ADMIN_USERS`: comma-separated usernames that should have access to the admin page (`/admin`).
+- `SHORTY_DEFAULT_STORAGE_ROOT`: optional absolute folder for default per-user storage. If omitted, Shorty uses project-local `-ShortyTables/<username>/`.
 - `FORCE_SECURE_COOKIES`: set to `1` only when traffic is HTTPS end-to-end; keep `0` for plain local HTTP.
 - `ENABLE_PROXYFIX`: keep `1` when behind nginx/ALB/reverse proxy so Flask reads forwarded host/scheme correctly; set `0` for direct local runs.
 - `FLASK_RUN_HOST` / `FLASK_RUN_PORT`: change when the app must bind to a different interface or port.
@@ -80,8 +81,18 @@ gunicorn -b 0.0.0.0:5004 -w 4 -k gevent 'manage:app'
 
 After login, use the left navigation:
 
-- `ShortyHTML` to edit snippet rows stored in `-ShortyTables/<username>/*.html`
-- `ShortyJSON` to edit snippet rows stored in `-ShortyTables/<username>/*.json`
+- `ShortyHTML` to edit snippet rows stored in `-ShortyTables/<username>/*.html` (default)
+- `ShortyJSON` to edit snippet rows stored in `-ShortyTables/<username>/*.json` (default)
+
+User-selected storage roots (USB/cloud-synced folders) follow the same layout:
+
+- `<selected-root>/*.html`
+- `<selected-root>/*.json`
+
+Browser-first mode for remote users:
+
+- In `ShortyHTML` or `ShortyJSON`, click `Connect Local Folder` to use the browser File System Access API.
+- After permission is granted, create/load/save actions run against the user's own local folder rather than the server filesystem.
 
 Top-row controls on each snippet page:
 

@@ -16,6 +16,8 @@ flask_session/
 .hintrc
 .env
 
+.ds
+
 #VS Code
 #.vscode
 #.vscode/

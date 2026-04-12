@@ -23,13 +23,15 @@ Shorty - Home Page
     <div style="clear: both; height: 1em;"></div>
     <div class="main-item" style="margin-bottom: 1em;">
         <h3>Shorty Storage Folder</h3>
-        <p><strong>Current folder:</strong> <code id="home-storage-current">(loading...)</code></p>
-        <p><strong>Default folder:</strong> <code id="home-storage-default">(loading...)</code></p>
+        <p><strong>Current server folder:</strong> <code id="home-storage-current">(loading...)</code></p>
+        <p><strong>Default server folder:</strong> <code id="home-storage-default">(loading...)</code></p>
+        <p><strong>Local browser folder:</strong> <code id="home-storage-local">(none)</code></p>
         <div style="margin-bottom: 0.4em;">
             <button type="button" id="home-pick-folder-btn" class="btn">Choose Folder</button>
             <button type="button" id="home-set-folder-btn" class="btn">Set Folder</button>
             <button type="button" id="home-reset-folder-btn" class="btn">Reset to Default</button>
         </div>
+        <p style="margin-top:0.35em;"><em>For browser-first usage, open ShortyHTML or ShortyJSON and use <strong>Connect Local Folder</strong> to grant file access on the client device.</em></p>
         <input id="home-storage-input" type="text" style="min-width: 28em; max-width: 98%;" placeholder="Absolute folder path (example: /Users/name/Documents/ShortyFiles)" />
         <p id="home-storage-status" class="message" style="margin-top:0.35em;"></p>
     </div>
@@ -41,19 +43,28 @@ Shorty - Home Page
             <li><strong>Use ShortyHTML</strong> when your content is primarily presentation and you want HTML-ready output for browser/web display.</li>
             <li><strong>Rule of thumb:</strong> JSON for data workflows, HTML for display workflows.</li>
         </ul>
-        <p>By default files are saved under <code>-ShortyTables/&lt;username&gt;/</code>, and you can switch each user's active folder at runtime from this Home page.</p>
+        <p>By default files are saved under server <code>-ShortyTables/&lt;username&gt;/</code>, with both <code>.html</code> and <code>.json</code> files stored directly in that folder. You can switch each user's active storage root at runtime from this Home page.</p>
     </div>
     <script>
         (function() {
             const currentEl = document.getElementById('home-storage-current');
             const defaultEl = document.getElementById('home-storage-default');
+            const localEl = document.getElementById('home-storage-local');
             const statusEl = document.getElementById('home-storage-status');
             const inputEl = document.getElementById('home-storage-input');
             const pickBtn = document.getElementById('home-pick-folder-btn');
             const setBtn = document.getElementById('home-set-folder-btn');
             const resetBtn = document.getElementById('home-reset-folder-btn');
+            const fsApiSupported = typeof window.showDirectoryPicker === 'function' && window.isSecureContext;
+            const HOME_FS_DB_NAME = 'shorty-file-access';
+            const HOME_FS_STORE_NAME = 'handles';
+            const HOME_FS_HANDLE_KEY = 'shorty-html-dir';
 
-            if (!currentEl || !defaultEl || !statusEl || !inputEl || !pickBtn || !setBtn || !resetBtn) return;
+            if (!currentEl || !defaultEl || !localEl || !statusEl || !inputEl || !pickBtn || !setBtn || !resetBtn) return;
+
+            if (fsApiSupported) {
+                pickBtn.textContent = 'Choose Local Folder';
+            }
 
             function setStatus(msg, isError) {
                 statusEl.textContent = msg || '';
@@ -70,8 +81,15 @@ Shorty - Home Page
                 inputEl.value = folder !== '(unavailable)' ? folder : '';
             }
 
+            function setLocalFolderDisplay(textValue, titleValue) {
+                const value = String(textValue || '').trim() || '(none)';
+                localEl.textContent = value;
+                localEl.parentElement.title = titleValue || value;
+            }
+
             function refreshFolderInfo() {
-                return fetch('/shorty_storage_folder')
+                const ts = Date.now();
+                return fetch('/shorty_storage_folder?ts=' + ts, { cache: 'no-store' })
                     .then(r => r.json())
                     .then(data => {
                         if (!data || data.error) {
@@ -79,6 +97,11 @@ Shorty - Home Page
                             return null;
                         }
                         updateDisplay(data);
+                        if (data.is_available === false) {
+                            setStatus(data.unavailable_message || 'Shorty storage folder unavailable. Reconnect drive or cloud folder and try again.', true);
+                        } else {
+                            setStatus('', false);
+                        }
                         return data;
                     })
                     .catch(err => {
@@ -102,7 +125,15 @@ Shorty - Home Page
                         setStatus('Unable to set folder: ' + (data && data.error ? data.error : 'unknown error'), true);
                         return;
                     }
-                    setStatus('Folder updated.');
+                    const merged = Object.assign({}, data || {});
+                    if (!merged.folder) merged.folder = folder;
+                    if (!merged.default_folder) merged.default_folder = defaultEl.textContent || '(unavailable)';
+                    updateDisplay(merged);
+                    if (data.is_available === false) {
+                        setStatus(data.unavailable_message || 'Shorty storage folder unavailable. Reconnect drive or cloud folder and try again.', true);
+                    } else {
+                        setStatus('Folder updated.', false);
+                    }
                     refreshFolderInfo();
                 }).catch(err => setStatus('Unable to set folder: ' + err, true));
             }
@@ -117,12 +148,106 @@ Shorty - Home Page
                 setFolder(entered);
             }
 
-            pickBtn.addEventListener('click', function() {
+            function openFsDb() {
+                return new Promise((resolve, reject) => {
+                    if (!window.indexedDB) {
+                        reject(new Error('IndexedDB unavailable'));
+                        return;
+                    }
+                    const req = indexedDB.open(HOME_FS_DB_NAME, 1);
+                    req.onupgradeneeded = function() {
+                        const db = req.result;
+                        if (!db.objectStoreNames.contains(HOME_FS_STORE_NAME)) {
+                            db.createObjectStore(HOME_FS_STORE_NAME);
+                        }
+                    };
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error || new Error('Unable to open browser storage'));
+                });
+            }
+
+            async function saveHomeLocalFolderHandle(handle) {
+                const db = await openFsDb();
+                try {
+                    await new Promise((resolve, reject) => {
+                        const tx = db.transaction(HOME_FS_STORE_NAME, 'readwrite');
+                        tx.objectStore(HOME_FS_STORE_NAME).put(handle, HOME_FS_HANDLE_KEY);
+                        tx.oncomplete = () => resolve();
+                        tx.onerror = () => reject(tx.error || new Error('Unable to save local folder handle'));
+                    });
+                } finally {
+                    db.close();
+                }
+            }
+
+            async function loadHomeLocalFolderHandle() {
+                const db = await openFsDb();
+                try {
+                    return await new Promise((resolve, reject) => {
+                        const tx = db.transaction(HOME_FS_STORE_NAME, 'readonly');
+                        const req = tx.objectStore(HOME_FS_STORE_NAME).get(HOME_FS_HANDLE_KEY);
+                        req.onsuccess = () => resolve(req.result || null);
+                        req.onerror = () => reject(req.error || new Error('Unable to read local folder handle'));
+                    });
+                } finally {
+                    db.close();
+                }
+            }
+
+            async function clearHomeLocalFolderHandle() {
+                const db = await openFsDb();
+                try {
+                    await new Promise((resolve, reject) => {
+                        const tx = db.transaction(HOME_FS_STORE_NAME, 'readwrite');
+                        tx.objectStore(HOME_FS_STORE_NAME).delete(HOME_FS_HANDLE_KEY);
+                        tx.oncomplete = () => resolve();
+                        tx.onerror = () => reject(tx.error || new Error('Unable to clear local folder handle'));
+                    });
+                } finally {
+                    db.close();
+                }
+            }
+
+            async function queryHomeLocalPermission(handle) {
+                if (!handle || typeof handle.queryPermission !== 'function') return false;
+                const permission = await handle.queryPermission({ mode: 'readwrite' });
+                return permission === 'granted';
+            }
+
+            async function refreshLocalFolderInfo() {
+                if (!fsApiSupported) {
+                    setLocalFolderDisplay('(browser file access unavailable)');
+                    return;
+                }
+                try {
+                    const savedHandle = await loadHomeLocalFolderHandle();
+                    if (!savedHandle) {
+                        setLocalFolderDisplay('(none)');
+                        return;
+                    }
+                    const folderName = savedHandle && savedHandle.name ? savedHandle.name : '(selected folder)';
+                    const granted = await queryHomeLocalPermission(savedHandle);
+                    if (granted) {
+                        setLocalFolderDisplay(folderName + ' (connected)');
+                    } else {
+                        setLocalFolderDisplay(folderName + ' (reconnect needed)');
+                    }
+                } catch (e) {
+                    setLocalFolderDisplay('(unable to read local folder)');
+                }
+            }
+
+            function runServerFolderPickerFlow() {
                 fetch('/pick_shorty_storage_folder', { method: 'POST' })
                     .then(r => r.json())
                     .then(data => {
                         if (data && data.success) {
-                            setStatus('Folder updated from picker.');
+                            updateDisplay(data);
+                            if (data.is_available === false) {
+                                setStatus(data.unavailable_message || 'Shorty storage folder unavailable. Reconnect drive or cloud folder and try again.', true);
+                            } else {
+                                setStatus('Folder updated from picker.', false);
+                            }
                             refreshFolderInfo();
                             return;
                         }
@@ -139,6 +264,41 @@ Shorty - Home Page
                         setStatus(errMsg, true);
                         promptForFolderAndSet(errMsg);
                     });
+            }
+
+            pickBtn.addEventListener('click', function() {
+                if (!fsApiSupported) {
+                    runServerFolderPickerFlow();
+                    return;
+                }
+                (async function() {
+                    try {
+                        const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                        if (handle && typeof handle.requestPermission === 'function') {
+                            const perm = await handle.requestPermission({ mode: 'readwrite' });
+                            if (perm !== 'granted') {
+                                setStatus('Local folder permission was not granted.', true);
+                                return;
+                            }
+                        }
+                        try {
+                            await saveHomeLocalFolderHandle(handle);
+                        } catch (storeErr) {
+                            console.warn('Unable to persist local folder handle', storeErr);
+                        }
+                        const folderName = handle && handle.name ? handle.name : '(selected folder)';
+                        setLocalFolderDisplay(folderName + ' (connected)', folderName);
+                        setStatus('Local folder connected: ' + folderName + '. Open ShortyHTML or ShortyJSON to use browser-local files.', false);
+                        refreshFolderInfo();
+                    } catch (err) {
+                        if (err && err.name === 'AbortError') {
+                            setStatus('Local folder picker canceled.', false);
+                            return;
+                        }
+                        // If browser picker fails unexpectedly, keep legacy server flow available.
+                        runServerFolderPickerFlow();
+                    }
+                })();
             });
 
             setBtn.addEventListener('click', function() {
@@ -148,18 +308,26 @@ Shorty - Home Page
             resetBtn.addEventListener('click', function() {
                 fetch('/reset_shorty_storage_folder', { method: 'POST' })
                     .then(r => r.json())
-                    .then(data => {
+                    .then(async data => {
                         if (!data || !data.success) {
                             setStatus('Unable to reset folder: ' + (data && data.error ? data.error : 'unknown error'), true);
                             return;
                         }
-                        setStatus('Folder reset to default.');
+                        updateDisplay(data);
+                        try {
+                            await clearHomeLocalFolderHandle();
+                        } catch (e) {
+                            console.warn('Unable to clear local folder handle on reset', e);
+                        }
+                        setLocalFolderDisplay('(none)');
+                        setStatus('Folder reset to default and reconnected to server storage.', false);
                         refreshFolderInfo();
                     })
                     .catch(err => setStatus('Unable to reset folder: ' + err, true));
             });
 
             refreshFolderInfo();
+            refreshLocalFolderInfo();
         })();
     </script>
 {% endblock %}

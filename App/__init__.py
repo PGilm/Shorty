@@ -83,13 +83,15 @@ app.register_blueprint(core_bp)
 def list_html():
     from flask import jsonify
     from flask_login import current_user
-    from App.core.storage import list_user_shorty_files
+    from App.core.storage import ShortyStorageUnavailableError, list_user_shorty_files
     username = getattr(current_user, 'username', None)
     if not username:
         return jsonify({'error': 'No authenticated username available'}), 403
     try:
         files = list_user_shorty_files(username, '.html')
         return jsonify(files)
+    except ShortyStorageUnavailableError as unavailable:
+        return jsonify({'error': str(unavailable)}), 409
     except Exception as e:
         return jsonify({'error': str(e)})
 
@@ -99,17 +101,21 @@ def list_html():
 def list_json():
     from flask import jsonify
     from flask_login import current_user
-    from App.core.storage import get_user_shorty_folder, list_user_shorty_files
+    from App.core.storage import ShortyStorageUnavailableError, list_user_shorty_files
     from flask import request as _flask_request
     username = getattr(current_user, 'username', None)
     if not username:
         return jsonify({'error': 'No authenticated username available'}), 403
     try:
-        folder = get_user_shorty_folder(username, create=True)
-        # Log request for remote debugging
-        app.logger.info(f"list_json called from {_flask_request.remote_addr}; folder={folder}")
         files = list_user_shorty_files(username, '.json')
+        app.logger.info(
+            "list_json called from %s; count=%s",
+            _flask_request.remote_addr,
+            len(files),
+        )
         return jsonify(files)
+    except ShortyStorageUnavailableError as unavailable:
+        return jsonify({'error': str(unavailable)}), 409
     except Exception as e:
         app.logger.exception("Error in list_json")
         return jsonify({'error': str(e)})

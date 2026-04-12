@@ -9,8 +9,8 @@ About Shorty — Documentation & Usage
 <h2>Overview</h2>
 <p>Shorty is a lightweight content manager with two table formats:</p>
 <ul>
-	<li><strong>ShortyHTML</strong>: HTML tables stored as minimal markup in your selected user storage folder (default is <code>-ShortyTables/&lt;username&gt;/</code>).</li>
-	<li><strong>ShortyJSON</strong>: JSON arrays of row objects stored in your selected user storage folder (default is <code>-ShortyTables/&lt;username&gt;/</code>).</li>
+	<li><strong>ShortyHTML</strong>: HTML tables stored as minimal markup in your selected user storage folder (default is server <code>-ShortyTables/&lt;username&gt;/</code>).</li>
+	<li><strong>ShortyJSON</strong>: JSON arrays of row objects stored in your selected user storage folder (default is server <code>-ShortyTables/&lt;username&gt;/</code>).</li>
 </ul>
 
 <h2>Which Format Should I Use?</h2>
@@ -23,7 +23,8 @@ About Shorty — Documentation & Usage
 
 <h2>Key Concepts</h2>
 <ul>
-	<li><strong>Storage</strong>: Files are stored per user in a runtime-selectable folder. Default path is <code>-ShortyTables/&lt;username&gt;/</code>.</li>
+	<li><strong>Storage</strong>: Files are stored per user in a runtime-selectable folder. Default path is server <code>-ShortyTables/&lt;username&gt;/</code> (or <code>SHORTY_DEFAULT_STORAGE_ROOT</code> if configured).</li>
+	<li><strong>Browser-local mode</strong>: On ShortyHTML or ShortyJSON, users can grant folder access from their own device using the File System Access API (<em>Connect Local Folder</em>) so file operations happen client-side.</li>
 	<li><strong>Separation of concerns</strong>: Shorty keeps stored HTML lean and applies UI styling at render time.</li>
 	<li><strong>Rendering</strong>: The app applies the <code>ShortyTable</code> (render-time) CSS class to tables so they display consistently. Stored files remain unstyled so they are portable and editable by other tools.</li>
 	<li><strong>Actions</strong>: When displayed in the UI, an extra Actions column is appended with Copy / Edit / Delete buttons — this column is runtime-only and not saved to disk.</li>
@@ -56,7 +57,7 @@ About Shorty — Documentation & Usage
 <ul>
 	<li>Templates: <code>App/templates/</code> (see <code>core/ShortyHTML.html</code> and <code>core/ShortyJSON.html</code>).</li>
 	<li>Static CSS: <code>App/static/Shorty-style.css</code> contains presentation rules applied to the rendered tables.</li>
-	<li>Saved data: each user has a selected storage folder; default is <code>-ShortyTables/&lt;username&gt;/</code> for .html and .json files.</li>
+	<li>Saved data: each user has a selected storage folder; default is server <code>-ShortyTables/&lt;username&gt;/</code> for .html and .json files.</li>
 	<li>Server endpoints: <code>/create_table</code>, <code>/create_json</code>, <code>/save_html</code>, and <code>/save_json</code> in <code>App/core/views.py</code>.</li>
 	<li>List endpoints: <code>/list_html</code> for ShortyHTML files and <code>/list_json</code> for ShortyJSON files.</li>
 </ul>

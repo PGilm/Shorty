@@ -11,13 +11,14 @@ ShortyHTML
 {% endblock %}
 {% block content %}
 
-    <input type="hidden" id="file-path" value="{{ filenamehtml }}">
-
     <form method="post" id="table-form">
         <select name="filename" id="tableSelect">
             <option value="">Select an HTML file</option>
             <option value="__new_html__">&lt;New HTML&gt;</option>
         </select>
+        <button type="button" id="connect-local-folder-btn" class="btn">Connect Local Folder</button>
+        <button type="button" id="use-server-storage-btn" class="btn" style="display:none;">Use Server Storage</button>
+        <span id="storage-mode-label" class="font-label" aria-live="polite"></span>
         <button type="button" id="add-row-btn" class="btn">Add Row</button>
         <button type="button" id="toggle-cell-mode-btn" class="btn">Toggle Cell Mode</button>
         <button type="button" id="toggle-sort-btn" class="btn">Reorder Rows</button>
@@ -42,11 +43,12 @@ ShortyHTML
         <button type="button" class="btn md-tool" data-md-action="link" title="Link">Link</button>
         <button type="button" class="btn md-tool" data-md-action="linebreak" title="Line Break">New Line</button>
     </div>
-    {% if session.table_html %}
-        <div>{{ session.table_html | safe }}</div>
-    {% else %}
-        <div class="message"></div>
-    {% endif %}
+    <div id="shorty-storage-message" class="message"></div>
+    <div id="shorty-table-container">
+        {% if session.table_html %}
+            <div>{{ session.table_html | safe }}</div>
+        {% endif %}
+    </div>
     <script>
         // Defensive debug flag to avoid ReferenceError when checking `debg`
         var debg = false;
@@ -69,53 +71,488 @@ ShortyHTML
         const CELL_MODE_MARKDOWN = 'markdown';
         const MARKDOWN_SOURCE_B64_ATTR = 'data-md-source-b64';
         const MARKDOWN_SOURCE_LEGACY_ATTR = 'data-md-source';
+        const SHORTY_FS_DB_NAME = 'shorty-file-access';
+        const SHORTY_FS_STORE_NAME = 'handles';
+        const SHORTY_FS_HANDLE_KEY = 'shorty-html-dir';
 
-        document.addEventListener('DOMContentLoaded', function() {
-            const currentFilename = "{{ session.filenamehtml }}";
-            const tableSelect = document.getElementById('tableSelect');
+        const shortyFsState = {
+            supported: typeof window.showDirectoryPicker === 'function' && window.isSecureContext,
+            mode: 'server',
+            directoryHandle: null,
+            fileHandles: new Map(),
+            activeFilename: '',
+            initialized: false
+        };
 
-            // Populate the selector and only auto-submit after list is loaded.
-            if (!window._shorty_list_table_fetched) {
-                window._shorty_list_table_fetched = true;
-                fetch('/list_html').then(response => response.json()).then(data => {
-                    if (data.error) {
-                        alert('Error: ' + data.error);
-                        return;
+        function isLocalFsMode() {
+            return shortyFsState.mode === 'local' && !!shortyFsState.directoryHandle;
+        }
+
+        function getTableSelect() {
+            return document.getElementById('tableSelect');
+        }
+
+        function getTableContainer() {
+            return document.getElementById('shorty-table-container');
+        }
+
+        function getStorageMessageEl() {
+            return document.getElementById('shorty-storage-message');
+        }
+
+        function setStorageModeLabel(text) {
+            const label = document.getElementById('storage-mode-label');
+            if (label) label.textContent = text || '';
+        }
+
+        function showStorageMessage(text, isError) {
+            const msgDiv = getStorageMessageEl();
+            if (!msgDiv) return;
+            msgDiv.textContent = text || '';
+            msgDiv.style.color = isError ? 'darkred' : 'darkgreen';
+        }
+
+        function clearStorageMessage() {
+            showStorageMessage('', false);
+        }
+
+        function clearRenderedTable() {
+            const container = getTableContainer();
+            if (!container) return;
+            container.innerHTML = '';
+            tableUiState.reorderMode = false;
+            tableUiState.selectedCell = null;
+            tableUiState.activeMarkdownEditor = null;
+            applyTableStyles();
+        }
+
+        function renderTableHtml(tableHtml) {
+            const container = getTableContainer();
+            if (!container) return;
+            container.innerHTML = '';
+            if (!tableHtml) {
+                applyTableStyles();
+                return;
+            }
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = tableHtml;
+            container.appendChild(wrapper);
+            applyTableStyles();
+        }
+
+        function createRuntimeActionCell(doc) {
+            const td = doc.createElement('td');
+            td.innerHTML = ''
+                + '<button type="button" id="copy-button" class="smbtn smbtn-copy">Copy</button>'
+                + '<button type="button" id="edit-button" class="smbtn smbtn-edit">Edit</button>'
+                + '<button type="button" id="delete-button" class="smbtn smbtn-delete">Delete</button>';
+            return td;
+        }
+
+        function createRuntimeActionHeader(doc) {
+            const th = doc.createElement('th');
+            const div = doc.createElement('div');
+            div.textContent = 'Actions';
+            th.appendChild(div);
+            return th;
+        }
+
+        function hasRuntimeActionCell(row) {
+            const last = row ? row.lastElementChild : null;
+            if (!last) return false;
+            return !!last.querySelector('.smbtn-copy, .smbtn-edit, .smbtn-delete');
+        }
+
+        function ensureRuntimeActions(table) {
+            if (!table) return;
+            table.classList.add('ShortyTable');
+            table.querySelectorAll('tr').forEach(row => {
+                if (hasRuntimeActionCell(row)) return;
+                const inHeader = !!row.closest('thead');
+                if (inHeader) {
+                    row.appendChild(createRuntimeActionHeader(table.ownerDocument));
+                } else {
+                    row.appendChild(createRuntimeActionCell(table.ownerDocument));
+                }
+            });
+        }
+
+        function loadRuntimeTableFromMarkup(markup, sourceLabel) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(String(markup || ''), 'text/html');
+            const table = doc.querySelector('table');
+            if (!table) {
+                clearRenderedTable();
+                showStorageMessage('No table found in ' + sourceLabel + '.', true);
+                return;
+            }
+            ensureRuntimeActions(table);
+            renderTableHtml(table.outerHTML);
+            clearStorageMessage();
+        }
+
+        function sanitizeHtmlFilename(name) {
+            const clean = String(name || '').trim();
+            if (!clean) return '';
+            let base = clean.replace(/[/\\]/g, '');
+            if (!base.toLowerCase().endsWith('.html')) base += '.html';
+            return base;
+        }
+
+        function resetSelectOptions(selectEl) {
+            if (!selectEl) return;
+            selectEl.innerHTML = '';
+            const emptyOpt = document.createElement('option');
+            emptyOpt.value = '';
+            emptyOpt.text = 'Select an HTML file';
+            selectEl.appendChild(emptyOpt);
+            const newOpt = document.createElement('option');
+            newOpt.value = NEW_TABLE_OPTION_VALUE;
+            newOpt.text = '<New HTML>';
+            selectEl.appendChild(newOpt);
+        }
+
+        function setSelectOptions(files) {
+            const tableSelect = getTableSelect();
+            if (!tableSelect) return;
+            resetSelectOptions(tableSelect);
+            (files || []).forEach(f => {
+                const option = document.createElement('option');
+                option.value = f;
+                option.text = f;
+                tableSelect.appendChild(option);
+            });
+        }
+
+        function openFsDb() {
+            return new Promise((resolve, reject) => {
+                if (!window.indexedDB) {
+                    reject(new Error('IndexedDB unavailable'));
+                    return;
+                }
+                const req = indexedDB.open(SHORTY_FS_DB_NAME, 1);
+                req.onupgradeneeded = function() {
+                    const db = req.result;
+                    if (!db.objectStoreNames.contains(SHORTY_FS_STORE_NAME)) {
+                        db.createObjectStore(SHORTY_FS_STORE_NAME);
                     }
-                    if (Array.isArray(data)) {
-                        data.forEach(f => {
-                            const option = document.createElement('option');
-                            option.value = f;
-                            option.text = f;
-                            tableSelect.appendChild(option);
-                        });
-                        // Set selected if current
-                        if (currentFilename) {
-                            const basename = currentFilename.split(/[\\/]/).pop();
-                            tableSelect.value = basename;
-                            localStorage.setItem('lastTableFilename', basename);
-                        } else {
-                            // Auto-load previously-used filename only if it
-                            // exists in the populated server-side list.
-                            const lastTable = localStorage.getItem('lastTableFilename');
-                            if (lastTable && !window._shorty_table_autosubmitted) {
-                                const exists = Array.from(tableSelect.options).some(o => o.value === lastTable);
-                                if (exists) {
-                                    window._shorty_table_autosubmitted = true;
-                                    tableSelect.value = lastTable;
-                                    tableSelect.form.submit();
-                                } else {
-                                    localStorage.removeItem('lastTableFilename');
-                                }
-                            }
-                        }
-                    }
-                }).catch(error => {
-                    alert('Error loading table list: ' + error);
+                };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error || new Error('Unable to open local storage'));
+            });
+        }
+
+        async function saveDirectoryHandle(handle) {
+            const db = await openFsDb();
+            try {
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction(SHORTY_FS_STORE_NAME, 'readwrite');
+                    tx.objectStore(SHORTY_FS_STORE_NAME).put(handle, SHORTY_FS_HANDLE_KEY);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => reject(tx.error || new Error('Failed to persist folder handle'));
+                });
+            } finally {
+                db.close();
+            }
+        }
+
+        async function loadSavedDirectoryHandle() {
+            const db = await openFsDb();
+            try {
+                return await new Promise((resolve, reject) => {
+                    const tx = db.transaction(SHORTY_FS_STORE_NAME, 'readonly');
+                    const req = tx.objectStore(SHORTY_FS_STORE_NAME).get(SHORTY_FS_HANDLE_KEY);
+                    req.onsuccess = () => resolve(req.result || null);
+                    req.onerror = () => reject(req.error || new Error('Failed to read folder handle'));
+                });
+            } finally {
+                db.close();
+            }
+        }
+
+        async function clearSavedDirectoryHandle() {
+            const db = await openFsDb();
+            try {
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction(SHORTY_FS_STORE_NAME, 'readwrite');
+                    tx.objectStore(SHORTY_FS_STORE_NAME).delete(SHORTY_FS_HANDLE_KEY);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => reject(tx.error || new Error('Failed to clear folder handle'));
+                });
+            } finally {
+                db.close();
+            }
+        }
+
+        async function queryDirectoryPermission(handle, writeAccess) {
+            if (!handle || typeof handle.queryPermission !== 'function') return false;
+            const mode = writeAccess ? 'readwrite' : 'read';
+            const permission = await handle.queryPermission({ mode: mode });
+            return permission === 'granted';
+        }
+
+        async function requestDirectoryPermission(handle, writeAccess) {
+            if (!handle || typeof handle.requestPermission !== 'function') return false;
+            const mode = writeAccess ? 'readwrite' : 'read';
+            const permission = await handle.requestPermission({ mode: mode });
+            return permission === 'granted';
+        }
+
+        async function refreshLocalHtmlFileList() {
+            if (!shortyFsState.directoryHandle) return [];
+            const files = [];
+            const map = new Map();
+            for await (const [name, handle] of shortyFsState.directoryHandle.entries()) {
+                if (!handle || handle.kind !== 'file') continue;
+                if (!String(name).toLowerCase().endsWith('.html')) continue;
+                files.push(name);
+                map.set(name, handle);
+            }
+            files.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+            shortyFsState.fileHandles = map;
+            setSelectOptions(files);
+            return files;
+        }
+
+        async function activateLocalFs(handle, persistHandle) {
+            shortyFsState.mode = 'local';
+            shortyFsState.directoryHandle = handle;
+            if (persistHandle) {
+                try {
+                    await saveDirectoryHandle(handle);
+                } catch (e) {
+                    console.warn('Unable to persist folder handle', e);
+                }
+            }
+            const files = await refreshLocalHtmlFileList();
+            const connectBtn = document.getElementById('connect-local-folder-btn');
+            const serverBtn = document.getElementById('use-server-storage-btn');
+            if (connectBtn) connectBtn.textContent = 'Change Local Folder';
+            if (serverBtn) serverBtn.style.display = '';
+            setStorageModeLabel('Mode: Local Browser Files');
+            const preferred = shortyFsState.activeFilename || localStorage.getItem('lastTableFilename') || '';
+            if (preferred && files.includes(preferred)) {
+                const selectEl = getTableSelect();
+                if (selectEl) selectEl.value = preferred;
+                await loadHtmlTableFromLocal(preferred);
+            } else if (files.length > 0) {
+                clearRenderedTable();
+                showStorageMessage('Connected. Select an HTML file from your local folder.', false);
+            } else {
+                clearRenderedTable();
+                showStorageMessage('Connected. No HTML files found yet in the selected folder.', false);
+            }
+        }
+
+        async function loadHtmlTableFromLocal(filename) {
+            const safeFilename = sanitizeHtmlFilename(filename);
+            if (!safeFilename || !isLocalFsMode()) return;
+            let handle = shortyFsState.fileHandles.get(safeFilename);
+            if (!handle) {
+                try {
+                    handle = await shortyFsState.directoryHandle.getFileHandle(safeFilename, { create: false });
+                    shortyFsState.fileHandles.set(safeFilename, handle);
+                } catch (e) {
+                    clearRenderedTable();
+                    showStorageMessage('File not found in selected folder: ' + safeFilename, true);
+                    return;
+                }
+            }
+            const file = await handle.getFile();
+            const text = await file.text();
+            loadRuntimeTableFromMarkup(text, safeFilename);
+            shortyFsState.activeFilename = safeFilename;
+            localStorage.setItem('lastTableFilename', safeFilename);
+        }
+
+        async function writeLocalHtmlFile(filename, tableHtml) {
+            if (!isLocalFsMode()) throw new Error('Local folder not connected');
+            const safeFilename = sanitizeHtmlFilename(filename);
+            if (!safeFilename) throw new Error('Select a filename first');
+            let handle = shortyFsState.fileHandles.get(safeFilename);
+            if (!handle) {
+                handle = await shortyFsState.directoryHandle.getFileHandle(safeFilename, { create: true });
+                shortyFsState.fileHandles.set(safeFilename, handle);
+            }
+            const writable = await handle.createWritable();
+            try {
+                await writable.write(tableHtml);
+            } finally {
+                await writable.close();
+            }
+            shortyFsState.activeFilename = safeFilename;
+            localStorage.setItem('lastTableFilename', safeFilename);
+            await refreshLocalHtmlFileList();
+            const selectEl = getTableSelect();
+            if (selectEl) selectEl.value = safeFilename;
+            return safeFilename;
+        }
+
+        async function createNewLocalHtmlTable(namePromptValue) {
+            const requested = sanitizeHtmlFilename(namePromptValue);
+            if (!requested) throw new Error('Filename is required');
+            const tableId = requested.replace(/\.html$/i, '');
+            const initialTable = (
+                '<table id="' + escapeHtml(tableId) + '" class="ShortyTable">'
+                + '<tbody>'
+                + '<tr>'
+                + '<td data-mode="text" contenteditable="true"><div></div></td>'
+                + '<td data-mode="text" contenteditable="true"><div></div></td>'
+                + '</tr>'
+                + '</tbody>'
+                + '</table>'
+            );
+            await writeLocalHtmlFile(requested, initialTable);
+            await loadHtmlTableFromLocal(requested);
+            return requested;
+        }
+
+        async function loadServerHtmlList(currentFilename, allowAutosubmit) {
+            const tableSelect = getTableSelect();
+            if (!tableSelect) return;
+            const response = await fetch('/list_html');
+            const data = await response.json();
+            if (data && data.error) {
+                const err = String(data.error || 'Unable to load server files');
+                showStorageMessage(err, true);
+                if (err.toLowerCase().indexOf('storage folder unavailable') < 0) {
+                    alert('Error: ' + err);
+                }
+                return;
+            }
+            if (!Array.isArray(data)) {
+                showStorageMessage('Unexpected response from server while listing files.', true);
+                return;
+            }
+            setSelectOptions(data);
+            const basename = currentFilename ? String(currentFilename).split(/[\\/]/).pop() : '';
+            if (basename && data.includes(basename)) {
+                tableSelect.value = basename;
+                localStorage.setItem('lastTableFilename', basename);
+                shortyFsState.activeFilename = basename;
+                clearStorageMessage();
+                return;
+            }
+            if (allowAutosubmit) {
+                const lastTable = localStorage.getItem('lastTableFilename');
+                if (lastTable && data.includes(lastTable)) {
+                    tableSelect.value = lastTable;
+                    shortyFsState.activeFilename = lastTable;
+                    tableSelect.form.submit();
+                    return;
+                }
+                if (lastTable && !data.includes(lastTable)) {
+                    localStorage.removeItem('lastTableFilename');
+                }
+            }
+            tableSelect.value = '';
+            clearStorageMessage();
+        }
+
+        async function connectLocalFolderFromPrompt() {
+            if (!shortyFsState.supported) {
+                showStorageMessage('Browser file access requires HTTPS and a Chromium-based browser.', true);
+                return;
+            }
+            try {
+                const directoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                const granted = await requestDirectoryPermission(directoryHandle, true);
+                if (!granted) {
+                    showStorageMessage('Folder permission was not granted.', true);
+                    return;
+                }
+                await activateLocalFs(directoryHandle, true);
+            } catch (e) {
+                if (e && e.name === 'AbortError') {
+                    showStorageMessage('Local folder selection canceled.', false);
+                    return;
+                }
+                showStorageMessage('Unable to open local folder: ' + String(e), true);
+            }
+        }
+
+        async function resetToServerStorage(currentFilename) {
+            shortyFsState.mode = 'server';
+            shortyFsState.directoryHandle = null;
+            shortyFsState.fileHandles = new Map();
+            shortyFsState.activeFilename = '';
+            try {
+                await clearSavedDirectoryHandle();
+            } catch (e) {
+                console.warn('Unable to clear saved local folder handle', e);
+            }
+            const connectBtn = document.getElementById('connect-local-folder-btn');
+            const serverBtn = document.getElementById('use-server-storage-btn');
+            if (connectBtn) connectBtn.textContent = 'Connect Local Folder';
+            if (serverBtn) serverBtn.style.display = 'none';
+            setStorageModeLabel('Mode: Server Storage');
+            clearRenderedTable();
+            await loadServerHtmlList(currentFilename || '', false);
+            showStorageMessage('Switched to server storage mode.', false);
+        }
+
+        async function initializeStorageMode(currentFilename) {
+            if (shortyFsState.initialized) return;
+            shortyFsState.initialized = true;
+
+            const connectBtn = document.getElementById('connect-local-folder-btn');
+            const serverBtn = document.getElementById('use-server-storage-btn');
+
+            if (connectBtn) {
+                connectBtn.addEventListener('click', function() {
+                    connectLocalFolderFromPrompt();
+                });
+            }
+            if (serverBtn) {
+                serverBtn.addEventListener('click', function() {
+                    resetToServerStorage(shortyFsState.activeFilename || currentFilename);
                 });
             }
 
-            // Handle change
+            if (!shortyFsState.supported) {
+                setStorageModeLabel('Mode: Server Storage (Local browser file access unavailable)');
+                if (connectBtn) connectBtn.disabled = true;
+                await loadServerHtmlList(currentFilename, true);
+                return;
+            }
+
+            setStorageModeLabel('Mode: Server Storage');
+            let restoredHandle = null;
+            let hadRestoredHandle = false;
+            try {
+                restoredHandle = await loadSavedDirectoryHandle();
+                hadRestoredHandle = !!restoredHandle;
+            } catch (e) {
+                console.warn('Unable to load persisted local folder handle', e);
+            }
+
+            if (restoredHandle) {
+                try {
+                    const granted = await queryDirectoryPermission(restoredHandle, true);
+                    if (granted) {
+                        await activateLocalFs(restoredHandle, false);
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('Saved local folder handle could not be reused', e);
+                }
+            }
+
+            await loadServerHtmlList(currentFilename, true);
+            if (hadRestoredHandle) {
+                showStorageMessage('Reconnect Local Folder to continue using browser-local files.', false);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentFilename = "{{ filenamehtml or '' }}";
+            const tableSelect = getTableSelect();
+
+            initializeStorageMode(currentFilename).catch(error => {
+                showStorageMessage('Error initializing storage mode: ' + String(error), true);
+            });
+
+            // Handle file selection changes.
             tableSelect.addEventListener('change', function() {
                 if (this.value === NEW_TABLE_OPTION_VALUE) {
                     createNewHtmlTableFromSelect(tableSelect);
@@ -123,21 +560,25 @@ ShortyHTML
                 }
                 if (this.value) {
                     localStorage.setItem('lastTableFilename', this.value);
-                    this.form.submit();
-                } else {
-                    // user selected the empty/default option - clear displayed table
-                    fetch('/clear_table', { method: 'POST' }).then(r=>r.json()).then(data=>{
-                        if (!data || data.error) { console.error('clear_table error', data); return; }
-                        localStorage.removeItem('lastTableFilename');
-                        const msgDiv = document.querySelector('.message');
-                        if (msgDiv) msgDiv.textContent = '';
-                        tableUiState.reorderMode = false;
-                        tableUiState.selectedCell = null;
-                        tableUiState.activeMarkdownEditor = null;
-                        const tbl = document.querySelector('table');
-                        if (tbl) tbl.remove();
-                        applyTableStyles();
-                    }).catch(e=>{ console.error('Error clearing table:', e); });
+                    shortyFsState.activeFilename = this.value;
+                    if (isLocalFsMode()) {
+                        loadHtmlTableFromLocal(this.value).catch(e => {
+                            showStorageMessage('Unable to load local file: ' + String(e), true);
+                        });
+                    } else {
+                        this.form.submit();
+                    }
+                    return;
+                }
+
+                localStorage.removeItem('lastTableFilename');
+                shortyFsState.activeFilename = '';
+                clearStorageMessage();
+                clearRenderedTable();
+                if (!isLocalFsMode()) {
+                    fetch('/clear_table', { method: 'POST' }).catch(e => {
+                        console.error('Error clearing server table state:', e);
+                    });
                 }
             });
 
@@ -302,21 +743,33 @@ ShortyHTML
                 restoreTableSelection(tableSelect, fallback);
                 return;
             }
+            if (isLocalFsMode()) {
+                createNewLocalHtmlTable(name).then(filename => {
+                    const safeFilename = sanitizeHtmlFilename(filename);
+                    tableSelect.value = safeFilename;
+                    shortyFsState.activeFilename = safeFilename;
+                    localStorage.setItem('lastTableFilename', safeFilename);
+                    showStorageMessage('Created local file: ' + safeFilename, false);
+                }).catch(e => {
+                    restoreTableSelection(tableSelect, fallback);
+                    showStorageMessage('Error creating local file: ' + String(e), true);
+                    alert('Error creating local file: ' + e);
+                });
+                return;
+            }
             fetch('/create_table', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ filename: name })
             }).then(r=>r.json()).then(data=>{
                 if (data && data.success) {
-                    let opt = Array.from(tableSelect.options).find(o => o.value === data.filename);
-                    if (!opt) {
-                        opt = document.createElement('option');
-                        opt.value = data.filename;
-                        opt.text = data.filename;
-                        tableSelect.appendChild(opt);
-                    }
+                    const files = Array.from(tableSelect.options).map(o => o.value).filter(v => v && v !== NEW_TABLE_OPTION_VALUE);
+                    if (!files.includes(data.filename)) files.push(data.filename);
+                    files.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+                    setSelectOptions(files);
                     tableSelect.value = data.filename;
                     localStorage.setItem('lastTableFilename', data.filename);
+                    shortyFsState.activeFilename = data.filename;
                     tableSelect.form.submit();
                 } else {
                     restoreTableSelection(tableSelect, fallback);
@@ -736,7 +1189,7 @@ ShortyHTML
             tableUiState.draggingRow = null;
         });
 
-        function saveCurrentTableToServer(){
+        async function saveCurrentTableToServer(){
             const table = document.querySelector('table');
             if (!table) { alert('No table to save'); return; }
             const clonedTable = table.cloneNode(true);
@@ -772,7 +1225,28 @@ ShortyHTML
             // remove any inline style attributes so saved file remains unstyled
             clonedTable.querySelectorAll('[style]').forEach(el => el.removeAttribute('style'));
             const updatedHtml = clonedTable.outerHTML;
-            const filePathValue = document.getElementById('file-path').value;
+            const selectedOption = document.getElementById('tableSelect');
+            const filePathValue = (
+                selectedOption &&
+                selectedOption.value &&
+                selectedOption.value !== NEW_TABLE_OPTION_VALUE
+            ) ? selectedOption.value : (localStorage.getItem('lastTableFilename') || '');
+            if (!filePathValue) {
+                alert('Select an HTML file first.');
+                return;
+            }
+            if (isLocalFsMode()) {
+                try {
+                    const savedFilename = await writeLocalHtmlFile(filePathValue, updatedHtml);
+                    loadRuntimeTableFromMarkup(updatedHtml, savedFilename);
+                    alert('Saved locally: ' + savedFilename);
+                    showStorageMessage('Saved to your local folder: ' + savedFilename, false);
+                } catch (e) {
+                    showStorageMessage('Error saving local file: ' + String(e), true);
+                    alert('Error saving local file: ' + e);
+                }
+                return;
+            }
             fetch('/save_html', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -784,8 +1258,8 @@ ShortyHTML
                 if (data) {
                     alert(data.message || 'Saved');
                     if (data.table_html) {
-                        const renderedTable = document.querySelector('table');
-                        if (renderedTable) renderedTable.outerHTML = data.table_html;
+                        renderTableHtml(data.table_html);
+                    } else {
                         applyTableStyles();
                     }
                 }

@@ -26,8 +26,11 @@ from App import bcrypt, db
 from App.security import two_factor_verified_required
 from App.core.shorty_users import generate_shorty_users
 from App.core.storage import (
+    ShortyStorageUnavailableError,
+    atomic_write_json,
+    atomic_write_text,
     clear_user_shorty_folder,
-    get_user_shorty_folder,
+    get_user_shorty_folder_for_extension,
     get_user_shorty_folder_info,
     set_user_shorty_folder,
 )
@@ -57,11 +60,19 @@ def _current_username():
     return None
 
 
+def _basename_or_empty(path_value):
+    return os.path.basename(str(path_value or "").strip())
+
+
 def _folder_with_filename(username, requested_name, fallback_name):
-    folder = get_user_shorty_folder(username, create=True)
+    fallback_base = os.path.basename(str(fallback_name or "shorty-data").strip())
     base_name = os.path.basename(str(requested_name or fallback_name or "").strip())
     if not base_name:
-        base_name = os.path.basename(str(fallback_name or "shorty-data"))
+        base_name = fallback_base
+    ext = os.path.splitext(base_name)[1].lower() or os.path.splitext(fallback_base)[1].lower()
+    folder = get_user_shorty_folder_for_extension(username, ext, create=True)
+    if ext and not base_name.lower().endswith(ext):
+        base_name = f"{base_name}{ext}"
     return os.path.join(folder, base_name)
 
 
@@ -125,10 +136,9 @@ def none():
             "core/home.html",
             name=current_user.username
         )
-    else:
-        flash("Hello! This flash message because this is your first time?", "info")
-        # Render the accounts login template directly to avoid redirect loops
-        return render_template('accounts/login.html')
+    # Always use the canonical login route so POST submits go to /login
+    # rather than / (which is GET-only and can produce 405).
+    return redirect(url_for('accounts.login'))
 
 @core_bp.route("/home/")
 @core_bp.route("/home/<name>")
@@ -280,6 +290,8 @@ def get_shorty_storage_folder():
         "folder": info.get("folder"),
         "default_folder": info.get("default_folder"),
         "is_default": info.get("is_default"),
+        "is_available": info.get("is_available"),
+        "unavailable_message": info.get("unavailable_message"),
     })
 
 
@@ -293,16 +305,24 @@ def set_shorty_storage_folder():
     payload = request.get_json(silent=True) or {}
     requested_folder = payload.get("folder")
     try:
-        folder = set_user_shorty_folder(username, requested_folder)
+        set_user_shorty_folder(username, requested_folder)
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 400
     except Exception as ex:
         return jsonify({"error": f"Unable to set folder: {ex}"}), 500
+    info = get_user_shorty_folder_info(username)
     session.pop("table_html", None)
     session.pop("table_json", None)
     session.pop("filenamehtml", None)
     session.pop("filenamejson", None)
-    return jsonify({"success": True, "folder": folder})
+    return jsonify({
+        "success": True,
+        "folder": info.get("folder"),
+        "default_folder": info.get("default_folder"),
+        "is_default": info.get("is_default"),
+        "is_available": info.get("is_available"),
+        "unavailable_message": info.get("unavailable_message"),
+    })
 
 
 @app.route("/reset_shorty_storage_folder", methods=["POST"])
@@ -322,7 +342,9 @@ def reset_shorty_storage_folder():
         "success": True,
         "folder": info.get("folder"),
         "default_folder": info.get("default_folder"),
-        "is_default": True,
+        "is_default": info.get("is_default"),
+        "is_available": info.get("is_available"),
+        "unavailable_message": info.get("unavailable_message"),
     })
 
 
@@ -354,15 +376,23 @@ def pick_shorty_storage_folder():
         return jsonify({"success": False, "cancelled": True})
 
     try:
-        folder = set_user_shorty_folder(username, selected_folder)
+        set_user_shorty_folder(username, selected_folder)
     except Exception as ex:
         return jsonify({"error": f"Unable to set folder: {ex}"}), 500
+    info = get_user_shorty_folder_info(username)
 
     session.pop("table_html", None)
     session.pop("table_json", None)
     session.pop("filenamehtml", None)
     session.pop("filenamejson", None)
-    return jsonify({"success": True, "folder": folder})
+    return jsonify({
+        "success": True,
+        "folder": info.get("folder"),
+        "default_folder": info.get("default_folder"),
+        "is_default": info.get("is_default"),
+        "is_available": info.get("is_available"),
+        "unavailable_message": info.get("unavailable_message"),
+    })
 
 @app.route("/shortytable/", methods=['GET', 'POST'])
 @app.route("/shortytable/<table_html>")
@@ -375,7 +405,15 @@ def shortytable(table_html=None):
             filename = os.path.basename(str(filename))
             # load from file from user's folder
             username = _current_username()
-            folder = get_user_shorty_folder(username, create=True)
+            try:
+                folder = get_user_shorty_folder_for_extension(username, ".html", create=True)
+            except ShortyStorageUnavailableError as unavailable:
+                session["table_html"] = str(unavailable)
+                return render_template(
+                    'core/ShortyHTML.html',
+                    table_html=session["table_html"],
+                    filenamehtml=_basename_or_empty(session.get("filenamehtml"))
+                )
             path = os.path.join(folder, filename)
             # Persist the requested path even when loading fails so the
             # frontend does not keep auto-submitting the same stale filename.
@@ -408,7 +446,7 @@ def shortytable(table_html=None):
                     return render_template(
                         'core/ShortyHTML.html',
                         table_html=session["table_html"],
-                        filenamehtml=session["filenamehtml"]
+                        filenamehtml=_basename_or_empty(session["filenamehtml"])
                     )
 
                 else:
@@ -416,15 +454,16 @@ def shortytable(table_html=None):
                     return render_template(
                         'core/ShortyHTML.html',
                         table_html=session["table_html"],
-                        filenamehtml=session.get("filenamehtml")
+                        filenamehtml=_basename_or_empty(session.get("filenamehtml"))
                     )
                                         
-            except Exception as e:
-                session["table_html"] = f"Error loading file: {e}"
+            except Exception:
+                app.logger.exception("Unable to load ShortyHTML file")
+                session["table_html"] = "Error loading file. Verify it exists in your active Shorty folder."
                 return render_template(
                     'core/ShortyHTML.html',
                     table_html=session.get("table_html"),
-                    filenamehtml=session.get("filenamehtml")
+                    filenamehtml=_basename_or_empty(session.get("filenamehtml"))
                 )
         else:
             sf.get_ShortyTable()
@@ -433,12 +472,12 @@ def shortytable(table_html=None):
         return render_template(
             "core/ShortyHTML.html",
             table_html = session["table_html"],
-            filenamehtml = session.get("filenamehtml")
+            filenamehtml = _basename_or_empty(session.get("filenamehtml"))
         )
     return render_template(
         'core/ShortyHTML.html',
         table_html = None,
-        filenamehtml = session.get("filenamehtml")
+        filenamehtml = _basename_or_empty(session.get("filenamehtml"))
         )
 
 @app.route("/shortyjson/", methods=['GET', 'POST'])
@@ -450,9 +489,17 @@ def shortyjson(table_json=None):
         filename = request.form.get('filename')
         if filename:
             filename = os.path.basename(str(filename))
-            # load from user's json folder
+            # load from user's selected storage folder
             username = _current_username()
-            folder = get_user_shorty_folder(username, create=True)
+            try:
+                folder = get_user_shorty_folder_for_extension(username, ".json", create=True)
+            except ShortyStorageUnavailableError as unavailable:
+                session["table_json"] = str(unavailable)
+                return render_template(
+                    'core/ShortyJSON.html',
+                    table_json=session.get("table_json"),
+                    filenamejson=_basename_or_empty(session.get("filenamejson"))
+                )
             path = os.path.join(folder, filename)
             try:
                 # remember which filename the user requested so the client-side
@@ -485,26 +532,41 @@ def shortyjson(table_json=None):
                     table_json += '</tbody></table>'
                     session["table_json"] = table_json
                     session["filenamejson"] = path
-                    return render_template('core/ShortyJSON.html', table_json=session["table_json"])
+                    return render_template(
+                        'core/ShortyJSON.html',
+                        table_json=session["table_json"],
+                        filenamejson=_basename_or_empty(session.get("filenamejson"))
+                    )
                 else:
                     session["table_json"] = "Invalid JSON format or empty data."
-                    return render_template('core/ShortyJSON.html', table_json=None)
-            except Exception as e:
+                    return render_template(
+                        'core/ShortyJSON.html',
+                        table_json=None,
+                        filenamejson=_basename_or_empty(session.get("filenamejson"))
+                    )
+            except Exception:
                 # ensure filename is persisted so client won't endlessly re-submit
                 session["filenamejson"] = path
-                session["table_json"] = f"Error loading file: {e}"
-                return render_template('core/ShortyJSON.html', table_json=session.get("table_json"))
+                app.logger.exception("Unable to load ShortyJSON file")
+                session["table_json"] = "Error loading file. Verify it exists in your active Shorty folder."
+                return render_template(
+                    'core/ShortyJSON.html',
+                    table_json=session.get("table_json"),
+                    filenamejson=_basename_or_empty(session.get("filenamejson"))
+                )
         else:
             sf.get_ShortyJson()
 
     if "table_json" in session:
         return render_template(
             "core/ShortyJSON.html",
-            table_json = session["table_json"]
+            table_json = session["table_json"],
+            filenamejson = _basename_or_empty(session.get("filenamejson"))
         )
     return render_template(
         'core/ShortyJSON.html',
-        table_json = None
+        table_json = None,
+        filenamejson = _basename_or_empty(session.get("filenamejson"))
         )
 
 @app.route('/save_json', methods=['POST'])
@@ -515,11 +577,13 @@ def save_json():
     json_data = data.get('json')
     requested_path = data.get('path')
     username = _current_username()
-    filename = _folder_with_filename(username, requested_path or session.get('filenamejson'), 'data.json')
+    try:
+        filename = _folder_with_filename(username, requested_path or session.get('filenamejson'), 'data.json')
+    except ShortyStorageUnavailableError as unavailable:
+        return jsonify({'message': str(unavailable)}), 409
     session['filenamejson'] = filename
     try:
-        with open(filename, 'w') as file:
-            json.dump(json_data, file, indent=4)
+        atomic_write_json(filename, json_data, indent=4)
         # Update session with the new table HTML
         table_json = f'<table id="{os.path.basename(filename)}" class="ShortyTable">'
         if json_data:
@@ -567,7 +631,10 @@ def save_html():
     
     html_content = data.get('html')
     username = _current_username()
-    path = _folder_with_filename(username, path or session.get("filenamehtml"), "shorty.html")
+    try:
+        path = _folder_with_filename(username, path or session.get("filenamehtml"), "shorty.html")
+    except ShortyStorageUnavailableError as unavailable:
+        return jsonify({'message': str(unavailable)}), 409
     session["filenamehtml"] = path
 
     if not html_content:
@@ -611,8 +678,7 @@ def save_html():
             tag.attrs = keep_attrs
 
         # Write cleaned HTML back to file
-        with open(path, 'w') as f:
-            f.write(str(table))
+        atomic_write_text(path, str(table), encoding='utf-8')
 
         # For the response we want to include the runtime Actions column
         display_soup = BeautifulSoup(str(table), 'html.parser')
@@ -654,7 +720,10 @@ def create_table():
     if not safe:
         return jsonify({'error': 'Invalid filename'}), 400
     username = _current_username()
-    folder = get_user_shorty_folder(username, create=True)
+    try:
+        folder = get_user_shorty_folder_for_extension(username, ".html", create=True)
+    except ShortyStorageUnavailableError as unavailable:
+        return jsonify({'error': str(unavailable)}), 409
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, f"{safe}.html")
     if os.path.exists(path):
@@ -671,8 +740,7 @@ def create_table():
             '</tr>'
             '</tbody></table>'
         )
-        with open(path, 'w') as f:
-            f.write(initial_table)
+        atomic_write_text(path, initial_table, encoding='utf-8')
         return jsonify({'success': True, 'filename': f'{safe}.html', 'path': path})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -690,7 +758,10 @@ def create_json():
     if not safe:
         return jsonify({'error': 'Invalid filename'}), 400
     username = _current_username()
-    folder = get_user_shorty_folder(username, create=True)
+    try:
+        folder = get_user_shorty_folder_for_extension(username, ".json", create=True)
+    except ShortyStorageUnavailableError as unavailable:
+        return jsonify({'error': str(unavailable)}), 409
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, f"{safe}.json")
     if os.path.exists(path):
@@ -699,8 +770,7 @@ def create_json():
         # Create a new json file with a single empty row scaffold so
         # the UI displays a proper empty row when loading.
         scaffold = [{"long_note": "", "short_form": ""}]
-        with open(path, 'w') as f:
-            json.dump(scaffold, f, indent=4)
+        atomic_write_json(path, scaffold, indent=4)
         return jsonify({'success': True, 'filename': f'{safe}.json', 'path': path})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
