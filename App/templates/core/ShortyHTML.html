@@ -175,6 +175,14 @@ ShortyHTML
                     row.appendChild(createRuntimeActionCell(table.ownerDocument));
                 }
             });
+            table.querySelectorAll('tbody tr').forEach(row => {
+                const cells = row.querySelectorAll('td');
+                for (let i = 0; i < cells.length - 1; i++) {
+                    const cell = cells[i];
+                    if (getCellMode(cell) === CELL_MODE_MARKDOWN) continue;
+                    setTextCellEditorMode(cell, false);
+                }
+            });
         }
 
         function loadRuntimeTableFromMarkup(markup, sourceLabel) {
@@ -396,8 +404,8 @@ ShortyHTML
                 '<table id="' + escapeHtml(tableId) + '" class="ShortyTable">'
                 + '<tbody>'
                 + '<tr>'
-                + '<td data-mode="text" contenteditable="true"><div></div></td>'
-                + '<td data-mode="text" contenteditable="true"><div></div></td>'
+                + '<td data-mode="text"><div></div></td>'
+                + '<td data-mode="text"><div></div></td>'
                 + '</tr>'
                 + '</tbody>'
                 + '</table>'
@@ -624,7 +632,7 @@ ShortyHTML
                 const newRow = document.createElement('tr');
                 let rowHtml = '';
                 for (let i = 0; i < numCols; i++) {
-                    rowHtml += '<td data-mode="text"><div contenteditable="true"></div></td>';
+                    rowHtml += '<td data-mode="text"><div></div></td>';
                 }
                 rowHtml += '<td>' +
                            '<button type="button" id="copy-button" class="smbtn smbtn-copy">Copy</button>' +
@@ -635,6 +643,7 @@ ShortyHTML
 
                 if (tbody.firstChild) tbody.insertBefore(newRow, tbody.firstChild);
                 else tbody.appendChild(newRow);
+                setRowEditMode(newRow, true);
                 applyTableStyles();
                 // focus first editable cell
                 const firstEditable = (tbody.firstChild || newRow).querySelector('div[contenteditable]');
@@ -922,6 +931,49 @@ ShortyHTML
             const div = cell.querySelector('div');
             if (div) return div.innerText || '';
             return cell.innerText || '';
+        }
+
+        function getTextCellEditorDiv(cell, createIfMissing) {
+            if (!cell) return null;
+            let div = cell.querySelector('div');
+            if (!div && createIfMissing) {
+                const textValue = cell.innerText || '';
+                cell.innerHTML = '<div></div>';
+                div = cell.querySelector('div');
+                if (div) div.innerText = textValue;
+            }
+            return div;
+        }
+
+        function setTextCellEditorMode(cell, editing) {
+            if (!cell) return;
+            const editor = getTextCellEditorDiv(cell, editing);
+            cell.contentEditable = 'false';
+            if (!editor) return;
+            if (editing) {
+                editor.setAttribute('contenteditable', 'true');
+                return;
+            }
+            const plain = editor.innerText || '';
+            cell.innerHTML = '<div></div>';
+            const normalizedDiv = cell.querySelector('div');
+            if (normalizedDiv) {
+                normalizedDiv.innerText = plain;
+                normalizedDiv.setAttribute('contenteditable', 'false');
+            }
+        }
+
+        function insertEditableLineBreak() {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return;
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            const br = document.createElement('br');
+            range.insertNode(br);
+            range.setStartAfter(br);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
         }
 
         function renderMarkdownCells(root) {
@@ -1284,7 +1336,7 @@ ShortyHTML
                         tableUiState.activeMarkdownEditor = editor;
                     }
                     if (getCellMode(cell) === CELL_MODE_TEXT) {
-                        cell.contentEditable = 'true';
+                        setTextCellEditorMode(cell, true);
                     } else {
                         cell.contentEditable = 'false';
                     }
@@ -1296,10 +1348,7 @@ ShortyHTML
                         setMarkdownSource(cell, source);
                         renderMarkdownCell(cell);
                     } else {
-                        const plain = cell.innerText || '';
-                        cell.innerHTML = '<div></div>';
-                        const div = cell.querySelector('div');
-                        if (div) div.innerText = plain;
+                        setTextCellEditorMode(cell, false);
                     }
                     cell.contentEditable = 'false';
                     cell.classList.remove('shorty-cell-editing');
@@ -1308,7 +1357,7 @@ ShortyHTML
             if (!editing) {
                 tableUiState.activeMarkdownEditor = null;
             } else {
-                const firstEditor = row.querySelector('textarea.shorty-md-editor');
+                const firstEditor = row.querySelector('textarea.shorty-md-editor, td[data-mode="text"] div[contenteditable="true"], td div[contenteditable="true"]');
                 if (firstEditor) firstEditor.focus();
             }
             syncToolbarState();
@@ -1358,6 +1407,19 @@ ShortyHTML
                 saveCurrentTableToServer();
                 return;
             }
+        });
+
+        document.addEventListener('keydown', function(event) {
+            if (event.defaultPrevented || event.isComposing) return;
+            if (event.key !== 'Enter') return;
+            if (!(event.target instanceof Element)) return;
+            if (event.target.closest('textarea.shorty-md-editor')) return;
+            const editor = event.target.closest('td div[contenteditable="true"]');
+            if (!editor) return;
+            const cell = editor.closest('td');
+            if (!cell || !isDataCell(cell) || getCellMode(cell) !== CELL_MODE_TEXT) return;
+            event.preventDefault();
+            insertEditableLineBreak();
         });
 
         // apply styles initially

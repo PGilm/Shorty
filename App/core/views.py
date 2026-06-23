@@ -655,14 +655,12 @@ def save_html():
                 cells[-1].decompose()  # remove last cell
 
         # Strip style, id, and event attributes. Keep only the element classes
-        # and a minimal allowlist needed for editing/display (data-field,
-        # contenteditable, and markdown cell metadata).
+        # and a minimal allowlist needed for editing/display (data-field and
+        # markdown cell metadata).
         for tag in table.find_all(True):
             keep_attrs = {}
             if 'class' in tag.attrs:
                 keep_attrs['class'] = tag.attrs.get('class')
-            if tag.name == 'td' and 'contenteditable' in tag.attrs:
-                keep_attrs['contenteditable'] = tag.attrs.get('contenteditable')
             if tag.name == 'td':
                 mode = tag.attrs.get('data-mode')
                 if mode in ('text', 'markdown'):
@@ -735,8 +733,8 @@ def create_table():
             f'<table id="{safe}" class="ShortyTable">'
             '<tbody>'
             '<tr>'
-            '<td data-mode="text" contenteditable="true"><div></div></td>'
-            '<td data-mode="text" contenteditable="true"><div></div></td>'
+            '<td data-mode="text"><div></div></td>'
+            '<td data-mode="text"><div></div></td>'
             '</tr>'
             '</tbody></table>'
         )

@@ -232,6 +232,11 @@ table.ShortyTable td:nth-child(3) {
     padding: 0;
 }
 
+table.ShortyTable.rows-double-height td:nth-child(3) {
+    min-height: var(--shorty-row-height);
+    height: var(--shorty-row-height);
+}
+
 .smbtn {
     display: block;
     width: 100%;
@@ -245,6 +250,10 @@ table.ShortyTable td:nth-child(3) {
 /* when inside the actions column keep normal block-level button sizing */
 table.ShortyTable td:nth-child(3) .smbtn {
     margin: 1px 0;
+}
+
+table.ShortyTable.rows-double-height td:nth-child(3) .smbtn {
+    height: calc((var(--shorty-row-height) / 3) - 2px);
 }
 
 .smbtn-copy {
