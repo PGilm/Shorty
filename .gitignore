@@ -21,8 +21,8 @@ flask_session/
 .ds
 
 #VS Code
-#.vscode
-#.vscode/
+.vscode
+.vscode/
 
 # OTHER RANDOM
 .pytest_cache/
