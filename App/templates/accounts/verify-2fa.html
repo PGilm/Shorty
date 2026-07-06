@@ -13,7 +13,7 @@ Two Factor Authentication Verification - Shorty
   <div class="col-md-4">
     <main class="form-signin w-100 m-auto">
       <form role="form" method="post" action="">
-        {{ form.csrf_token }}
+        {{ form.hidden_tag() }}
         <h1 class="h3 mb-3 fw-normal text-center">Enter OTP</h1>
 
         <div class="form-floating">

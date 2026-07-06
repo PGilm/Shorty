@@ -13,8 +13,8 @@ Please log in with your user name and password - Shorty
   <div class="col-md-4">
     <main class="form-signin w-100 m-auto">
       <form role="form" method="post" action="{{ url_for('accounts.login', next=request.args.get('next')) }}">
-        {{ form.csrf_token }}
-        {% if form.csrf_token.errors %}
+        {{ form.hidden_tag() }}
+        {% if form.csrf_token is defined and form.csrf_token.errors %}
           {% for error in form.csrf_token.errors %}
             <div class="alert alert-danger" role="alert">{{ error }}</div>
           {% endfor %}
