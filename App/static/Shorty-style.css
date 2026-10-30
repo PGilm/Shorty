@@ -131,6 +131,17 @@ table.ShortyTable td {
     border: solid black 1.5px ;
 }
 
+table.ShortyTable td div[contenteditable="true"] {
+    box-sizing: border-box;
+    padding-left: 0.35em;
+    caret-color: #111;
+}
+
+table.ShortyTable td div[contenteditable="true"]:focus {
+    outline: 2px solid #1f6feb;
+    outline-offset: -2px;
+}
+
 table.ShortyTable td.shorty-cell-selected {
     outline: 2px solid #1f6feb;
     outline-offset: -2px;
@@ -232,6 +243,13 @@ table.ShortyTable td:nth-child(3) {
     padding: 0;
 }
 
+table.ShortyTable td.shorty-actions-cell {
+    width: 6em;
+    min-width: 6em;
+    padding: 0.1em;
+    background-color: darkgreen;
+}
+
 table.ShortyTable.rows-double-height td:nth-child(3) {
     min-height: var(--shorty-row-height);
     height: var(--shorty-row-height);
@@ -252,6 +270,13 @@ table.ShortyTable td:nth-child(3) .smbtn {
     margin: 1px 0;
 }
 
+table.ShortyTable td.shorty-actions-cell .smbtn {
+    box-sizing: border-box;
+    height: auto;
+    min-height: 1.7em;
+    white-space: nowrap;
+}
+
 table.ShortyTable.rows-double-height td:nth-child(3) .smbtn {
     height: calc((var(--shorty-row-height) / 3) - 2px);
 }
@@ -268,6 +293,11 @@ table.ShortyTable.rows-double-height td:nth-child(3) .smbtn {
 
 .smbtn-delete {
     background-color: #f44336; /* Red */
+    color: white;
+}
+
+.smbtn-reset {
+    background-color: #555;
     color: white;
 }
 

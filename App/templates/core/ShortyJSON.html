@@ -15,12 +15,8 @@ ShortyJSON
             <option value="">Select a JSON file</option>
             <option value="__new_json__">&lt;New JSON&gt;</option>
         </select>
-        <button type="button" id="connect-local-folder-btn" class="btn">Connect Local Folder</button>
-        <button type="button" id="use-server-storage-btn" class="btn" style="display:none;">Use Server Storage</button>
-        <span id="storage-mode-label" class="font-label" aria-live="polite"></span>
-        <button type="button" id="add-row-btn" class="btn">Add Row</button>
         <button type="button" id="toggle-sort-btn" class="btn">Reorder Rows</button>
-        <button type="button" id="toggle-row-height-btn" class="btn">Double Row Height</button>
+        <button type="button" id="toggle-row-height-btn" class="btn" title="Increase row height">Row+</button>
         <div class="font-controls" aria-label="Table font size controls">
             <button type="button" id="decrease-font-btn" class="btn font-btn" title="Decrease table font size">A-</button>
             <button type="button" id="increase-font-btn" class="btn font-btn" title="Increase table font size">A+</button>
@@ -121,7 +117,41 @@ ShortyJSON
             const wrapper = document.createElement('div');
             wrapper.innerHTML = tableHtml;
             container.appendChild(wrapper);
+            ensureSyntheticRow(wrapper.querySelector('table'));
             applyTableStyles();
+        }
+
+        function ensureSyntheticRow(table) {
+            if (!table) return;
+            const tbody = table.querySelector('tbody');
+            if (!tbody) return;
+
+            let row = tbody.querySelector('tr[data-shorty-synthetic-row="true"]');
+            if (!row) {
+                const headers = Array.from(table.querySelectorAll('thead th')).slice(0, -1);
+                row = document.createElement('tr');
+                row.dataset.shortySyntheticRow = 'true';
+                headers.forEach((header, index) => {
+                    const cell = document.createElement('td');
+                    const editor = document.createElement('div');
+                    editor.contentEditable = 'true';
+                    editor.textContent = index === 0 ? '<new row>' : (index === 1 ? '<press save to make a new row>' : '');
+                    cell.appendChild(editor);
+                    row.appendChild(cell);
+                });
+                const actionCell = document.createElement('td');
+                actionCell.classList.add('shorty-actions-cell');
+                actionCell.innerHTML = ''
+                    + '<button type="button" class="smbtn smbtn-copy">Copy</button>'
+                    + '<button type="button" class="smbtn smbtn-edit">Save</button>'
+                    + '<button type="button" class="smbtn smbtn-reset">Reset</button>';
+                row.appendChild(actionCell);
+            }
+            Array.from(row.querySelectorAll('td')).slice(0, -1).forEach(cell => {
+                const editor = cell.querySelector('div');
+                if (editor) editor.contentEditable = 'true';
+            });
+            tbody.appendChild(row);
         }
 
         function sanitizeJsonFilename(name) {
@@ -182,11 +212,7 @@ ShortyJSON
                 headers = ['long_note', 'short_form'];
             }
 
-            const blankRow = {};
-            headers.forEach(header => {
-                blankRow[header] = '';
-            });
-            const tableRows = rows.length > 0 ? rows : [blankRow];
+            const tableRows = rows;
             const tableId = sanitizeJsonFilename(filenameLabel || 'shorty-data.json').replace(/\.json$/i, '') || 'shorty-data';
 
             let html = '<table id="' + escapeHtml(tableId) + '" class="ShortyTable">';
@@ -224,7 +250,8 @@ ShortyJSON
         function tableToJsonData(table) {
             if (!table) return [];
             const headers = Array.from(table.querySelectorAll('thead th')).slice(0, -1).map(th => th.textContent.trim());
-            const rows = Array.from(table.querySelectorAll('tbody tr'));
+            const rows = Array.from(table.querySelectorAll('tbody tr'))
+                .filter(row => row.dataset.shortySyntheticRow !== 'true');
             return rows.map(row => {
                 const cells = Array.from(row.querySelectorAll('td')).slice(0, headers.length);
                 const obj = {};
@@ -262,6 +289,10 @@ ShortyJSON
             if (table) {
                 table.classList.add('ShortyTable');
                 table.classList.toggle('rows-double-height', tableUiState.doubleHeight);
+                ensureSyntheticRow(table);
+                table.querySelectorAll('tbody tr').forEach(row => {
+                    if (row.lastElementChild) row.lastElementChild.classList.add('shorty-actions-cell');
+                });
             }
 
             const container = getTableContainer();
@@ -287,7 +318,8 @@ ShortyJSON
                 sortButton.textContent = tableUiState.reorderMode ? 'Done Reordering' : 'Reorder Rows';
             }
             if (rowHeightButton) {
-                rowHeightButton.textContent = tableUiState.doubleHeight ? 'Normal Row Height' : 'Double Row Height';
+                rowHeightButton.textContent = tableUiState.doubleHeight ? 'Row-' : 'Row+';
+                rowHeightButton.title = tableUiState.doubleHeight ? 'Return to normal row height' : 'Increase row height';
             }
             if (fontLabel) {
                 fontLabel.textContent = 'Font ' + formatFontScale(tableUiState.fontScale);
@@ -304,7 +336,7 @@ ShortyJSON
             }
             tbody.classList.toggle('row-reorder-mode', tableUiState.reorderMode);
             tbody.querySelectorAll('tr').forEach(row => {
-                row.draggable = tableUiState.reorderMode;
+                row.draggable = tableUiState.reorderMode && row.dataset.shortySyntheticRow !== 'true';
                 row.classList.remove('dragging-row');
             });
         }
@@ -735,7 +767,7 @@ ShortyJSON
             }).then(data => {
                 if (!data) return;
                 alert(data.message);
-                if (data.table_json) {
+                if (data.table_json && data.table_json.includes('<table')) {
                     renderTableHtml(data.table_json);
                 }
             }).catch(e => alert('Error: ' + e));
@@ -795,28 +827,6 @@ ShortyJSON
                 applyTableStyles();
             });
 
-            document.getElementById('add-row-btn').addEventListener('click', function() {
-                const table = getActiveTable();
-                if (!table) {
-                    alert('No table loaded');
-                    return;
-                }
-                const tbody = table.querySelector('tbody');
-                const headers = Array.from(table.querySelectorAll('thead th')).slice(0, -1);
-                const newRow = document.createElement('tr');
-                let cellsHtml = '';
-                for (let i = 0; i < headers.length; i++) {
-                    cellsHtml += '<td><div contenteditable="true"></div></td>';
-                }
-                cellsHtml += '<td><button type="button" id="copy-button" class="smbtn smbtn-copy">Copy</button>'
-                    + '<button type="button" id="edit-button" class="smbtn smbtn-edit">Save</button>'
-                    + '<button type="button" id="delete-button" class="smbtn smbtn-delete">Delete</button></td>';
-                newRow.innerHTML = cellsHtml;
-                if (tbody.firstChild) tbody.insertBefore(newRow, tbody.firstChild);
-                else tbody.appendChild(newRow);
-                applyTableStyles();
-            });
-
             document.getElementById('toggle-sort-btn').addEventListener('click', function() {
                 const table = getActiveTable();
                 if (!table) {
@@ -847,6 +857,7 @@ ShortyJSON
             if (!(event.target instanceof Element)) return;
             const row = event.target.closest('tbody tr');
             if (!row) return;
+            if (row.dataset.shortySyntheticRow === 'true') return;
             tableUiState.draggingRow = row;
             row.classList.add('dragging-row');
             if (event.dataTransfer) {
@@ -866,6 +877,7 @@ ShortyJSON
             const rect = row.getBoundingClientRect();
             const insertBefore = event.clientY < rect.top + (rect.height / 2);
             tbody.insertBefore(tableUiState.draggingRow, insertBefore ? row : row.nextSibling);
+            ensureSyntheticRow(tbody.closest('table'));
         });
 
         document.addEventListener('drop', function(event) {
@@ -887,6 +899,21 @@ ShortyJSON
         });
 
         document.addEventListener('click', function(event) {
+            if (event.target instanceof Element) {
+                const defaultEditor = event.target.closest('tr[data-shorty-synthetic-row="true"] td div[contenteditable="true"]');
+                if (defaultEditor && ['<new row>', '<press save to make a new row>'].includes(defaultEditor.textContent.trim())) {
+                    requestAnimationFrame(() => {
+                        if (!defaultEditor.isConnected) return;
+                        const selection = window.getSelection();
+                        if (!selection) return;
+                        const range = document.createRange();
+                        range.selectNodeContents(defaultEditor);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                    });
+                }
+            }
+
             if (event.target && (event.target.id === 'copy-button' || event.target.classList.contains('smbtn-copy'))) {
                 const leftCell = event.target.closest('td').previousElementSibling;
                 const leftCellText = leftCell ? leftCell.innerText : '';
@@ -902,6 +929,22 @@ ShortyJSON
             if (event.target && (event.target.id === 'edit-button' || event.target.classList.contains('smbtn-edit'))) {
                 const row = event.target.closest('tr');
                 if (!row) return;
+                if (row.dataset.shortySyntheticRow === 'true') {
+                    row.removeAttribute('data-shorty-synthetic-row');
+                    row.querySelectorAll('td').forEach((cell, index, cells) => {
+                        if (index < cells.length - 1) {
+                            cell.contentEditable = 'false';
+                            cell.querySelectorAll('[contenteditable="true"]').forEach(editor => {
+                                editor.contentEditable = 'false';
+                            });
+                        }
+                    });
+                    event.target.innerText = 'Edit';
+                    ensureSyntheticRow(row.closest('table'));
+                    applyTableStyles();
+                    saveJsonTable();
+                    return;
+                }
                 const cells = row.querySelectorAll('td');
                 if (event.target.innerText.trim() === 'Edit') {
                     for (let i = 0; i < cells.length - 1; i++) cells[i].contentEditable = 'true';
@@ -921,6 +964,16 @@ ShortyJSON
                     row.parentNode.removeChild(row);
                     saveJsonTable();
                 }
+            }
+
+            if (event.target && event.target.classList.contains('smbtn-reset')) {
+                const row = event.target.closest('tr[data-shorty-synthetic-row="true"]');
+                if (!row) return;
+                Array.from(row.querySelectorAll('td')).slice(0, -1).forEach((cell, index) => {
+                    const editor = cell.querySelector('div');
+                    if (editor) editor.textContent = index === 0 ? '<new row>' : (index === 1 ? '<press save to make a new row>' : '');
+                });
+                return;
             }
         });
 

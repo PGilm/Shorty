@@ -16,13 +16,9 @@ ShortyHTML
             <option value="">Select an HTML file</option>
             <option value="__new_html__">&lt;New HTML&gt;</option>
         </select>
-        <button type="button" id="connect-local-folder-btn" class="btn">Connect Local Folder</button>
-        <button type="button" id="use-server-storage-btn" class="btn" style="display:none;">Use Server Storage</button>
-        <span id="storage-mode-label" class="font-label" aria-live="polite"></span>
-        <button type="button" id="add-row-btn" class="btn">Add Row</button>
-        <button type="button" id="toggle-cell-mode-btn" class="btn">Toggle Cell Mode</button>
+        <button type="button" id="toggle-cell-mode-btn" class="btn" title="Toggle between .txt and .md cell modes">.txt</button>
         <button type="button" id="toggle-sort-btn" class="btn">Reorder Rows</button>
-        <button type="button" id="toggle-row-height-btn" class="btn">Double Row Height</button>
+        <button type="button" id="toggle-row-height-btn" class="btn" title="Increase row height">Row+</button>
         <div class="font-controls" aria-label="Table font size controls">
             <button type="button" id="decrease-font-btn" class="btn font-btn" title="Decrease table font size">A-</button>
             <button type="button" id="increase-font-btn" class="btn font-btn" title="Increase table font size">A+</button>
@@ -137,11 +133,93 @@ ShortyHTML
             const wrapper = document.createElement('div');
             wrapper.innerHTML = tableHtml;
             container.appendChild(wrapper);
+            const table = wrapper.querySelector('table');
+            if (table) {
+                ensureRuntimeActions(table);
+                ensureSyntheticRow(table);
+            }
             applyTableStyles();
+        }
+
+        function ensureSyntheticRow(table) {
+            if (!table) return;
+            const tbody = table.querySelector('tbody');
+            if (!tbody) return;
+
+            let row = tbody.querySelector('tr[data-shorty-synthetic-row="true"]');
+            const isNewRow = !row;
+            if (!row) {
+                const headerRow = table.querySelector('thead tr');
+                const headerCells = headerRow ? Array.from(headerRow.querySelectorAll('th, td')) : [];
+                let columnCount = headerCells.length
+                    ? headerCells.filter(cell => cell.textContent.trim().toLowerCase() !== 'actions').length
+                    : 0;
+                if (!columnCount) {
+                    const firstRow = tbody.querySelector('tr');
+                    if (firstRow) {
+                        const dataCells = Array.from(firstRow.querySelectorAll('td')).filter(cell =>
+                            !cell.querySelector('.smbtn-copy, .smbtn-edit, .smbtn-delete, #copy-button, #edit-button, #delete-button')
+                        );
+                        columnCount = Math.max(1, dataCells.length);
+                    } else {
+                        columnCount = 2;
+                    }
+                }
+
+                row = document.createElement('tr');
+                row.dataset.shortySyntheticRow = 'true';
+                for (let index = 0; index < columnCount; index++) {
+                    const cell = document.createElement('td');
+                    cell.dataset.mode = 'text';
+                    const editor = document.createElement('div');
+                    editor.contentEditable = 'true';
+                    editor.textContent = index === 0 ? '<new row>' : (index === 1 ? '<press save to make a new row>' : '');
+                    cell.appendChild(editor);
+                    row.appendChild(cell);
+                }
+            }
+            let actionCell = row.lastElementChild;
+            if (!isNewRow && actionCell && actionCell.tagName === 'TD' && actionCell.classList.contains('shorty-actions-cell') && !actionCell.querySelector('.smbtn-edit')) {
+                actionCell.innerHTML = ''
+                    + '<button type="button" class="smbtn smbtn-copy">Copy</button>'
+                    + '<button type="button" class="smbtn smbtn-edit">Save</button>'
+                    + '<button type="button" class="smbtn smbtn-reset">Reset</button>';
+            } else if (isNewRow || !actionCell || actionCell.tagName !== 'TD' || !actionCell.querySelector('.smbtn-edit')) {
+                actionCell = document.createElement('td');
+                actionCell.innerHTML = ''
+                    + '<button type="button" class="smbtn smbtn-copy">Copy</button>'
+                    + '<button type="button" class="smbtn smbtn-edit">Save</button>'
+                    + '<button type="button" class="smbtn smbtn-reset">Reset</button>';
+                row.appendChild(actionCell);
+            } else {
+                const saveButton = actionCell.querySelector('.smbtn-edit');
+                if (saveButton) saveButton.textContent = 'Save';
+                if (!actionCell.querySelector('.smbtn-copy')) {
+                    const copyButton = document.createElement('button');
+                    copyButton.type = 'button';
+                    copyButton.className = 'smbtn smbtn-copy';
+                    copyButton.textContent = 'Copy';
+                    actionCell.insertBefore(copyButton, saveButton || actionCell.firstChild);
+                }
+                if (!actionCell.querySelector('.smbtn-reset')) {
+                    const resetButton = document.createElement('button');
+                    resetButton.type = 'button';
+                    resetButton.className = 'smbtn smbtn-reset';
+                    resetButton.textContent = 'Reset';
+                    actionCell.appendChild(resetButton);
+                }
+            }
+            actionCell.classList.add('shorty-actions-cell');
+            Array.from(row.querySelectorAll('td')).slice(0, -1).forEach(cell => {
+                const editor = cell.querySelector('div');
+                if (editor) editor.contentEditable = 'true';
+            });
+            tbody.appendChild(row);
         }
 
         function createRuntimeActionCell(doc) {
             const td = doc.createElement('td');
+            td.classList.add('shorty-actions-cell');
             td.innerHTML = ''
                 + '<button type="button" id="copy-button" class="smbtn smbtn-copy">Copy</button>'
                 + '<button type="button" id="edit-button" class="smbtn smbtn-edit">Edit</button>'
@@ -177,6 +255,7 @@ ShortyHTML
             });
             table.querySelectorAll('tbody tr').forEach(row => {
                 const cells = row.querySelectorAll('td');
+                if (cells.length) cells[cells.length - 1].classList.add('shorty-actions-cell');
                 for (let i = 0; i < cells.length - 1; i++) {
                     const cell = cells[i];
                     if (getCellMode(cell) === CELL_MODE_MARKDOWN) continue;
@@ -608,48 +687,6 @@ ShortyHTML
                 applyTableStyles();
             });
 
-            // Add Row button: add an editable blank row at top
-            document.getElementById('add-row-btn').addEventListener('click', function(){
-                const table = document.querySelector('table');
-                if (!table) { alert('No table loaded'); return; }
-                const tbody = table.querySelector('tbody');
-
-                // determine number of data columns (exclude the actions column if present)
-                let numCols = 0;
-                const thead = table.querySelector('thead');
-                if (thead) {
-                    const headers = Array.from(thead.querySelectorAll('th'));
-                    numCols = Math.max(1, headers.length - 1); // last header is Actions
-                } else {
-                    const firstRow = table.querySelector('tbody tr');
-                    if (firstRow) {
-                        numCols = Math.max(1, firstRow.querySelectorAll('td').length - 1);
-                    } else {
-                        numCols = 2; // fallback
-                    }
-                }
-
-                const newRow = document.createElement('tr');
-                let rowHtml = '';
-                for (let i = 0; i < numCols; i++) {
-                    rowHtml += '<td data-mode="text"><div></div></td>';
-                }
-                rowHtml += '<td>' +
-                           '<button type="button" id="copy-button" class="smbtn smbtn-copy">Copy</button>' +
-                           '<button type="button" id="edit-button" class="smbtn smbtn-edit">Save</button>' +
-                           '<button type="button" id="delete-button" class="smbtn smbtn-delete">Delete</button>' +
-                           '</td>';
-                newRow.innerHTML = rowHtml;
-
-                if (tbody.firstChild) tbody.insertBefore(newRow, tbody.firstChild);
-                else tbody.appendChild(newRow);
-                setRowEditMode(newRow, true);
-                applyTableStyles();
-                // focus first editable cell
-                const firstEditable = (tbody.firstChild || newRow).querySelector('div[contenteditable]');
-                if (firstEditable) firstEditable.focus();
-            });
-
             document.getElementById('toggle-sort-btn').addEventListener('click', function() {
                 const table = document.querySelector('table');
                 if (!table) { alert('No table loaded'); return; }
@@ -796,6 +833,8 @@ ShortyHTML
                 if (table) {
                     table.classList.add('ShortyTable');
                     table.classList.toggle('rows-double-height', tableUiState.doubleHeight);
+                    ensureRuntimeActions(table);
+                    ensureSyntheticRow(table);
                 }
                 // Remove residual inline styles that may have been applied
                 document.querySelectorAll('table, th, td, td div, button.smbtn').forEach(el => { if (el && el.style) el.style.cssText = ''; });
@@ -817,7 +856,8 @@ ShortyHTML
                 sortButton.textContent = tableUiState.reorderMode ? 'Done Reordering' : 'Reorder Rows';
             }
             if (rowHeightButton) {
-                rowHeightButton.textContent = tableUiState.doubleHeight ? 'Normal Row Height' : 'Double Row Height';
+                rowHeightButton.textContent = tableUiState.doubleHeight ? 'Row-' : 'Row+';
+                rowHeightButton.title = tableUiState.doubleHeight ? 'Return to normal row height' : 'Increase row height';
             }
             if (fontLabel) {
                 fontLabel.textContent = 'Font ' + formatFontScale(tableUiState.fontScale);
@@ -835,11 +875,12 @@ ShortyHTML
             if (!button) return;
             const selectedCell = tableUiState.selectedCell;
             if (!selectedCell || !selectedCell.isConnected) {
-                button.textContent = 'Toggle Cell Mode';
+                button.textContent = '.txt';
                 return;
             }
             const mode = getCellMode(selectedCell);
-            button.textContent = mode === CELL_MODE_MARKDOWN ? 'Cell Mode: Markdown' : 'Cell Mode: Text';
+            button.textContent = mode === CELL_MODE_MARKDOWN ? '.md' : '.txt';
+            button.title = mode === CELL_MODE_MARKDOWN ? 'Toggle cell to .txt mode' : 'Toggle cell to .md mode';
         }
 
         function isDataCell(cell) {
@@ -1192,7 +1233,7 @@ ShortyHTML
             }
             tbody.classList.toggle('row-reorder-mode', tableUiState.reorderMode);
             tbody.querySelectorAll('tr').forEach(row => {
-                row.draggable = tableUiState.reorderMode;
+                row.draggable = tableUiState.reorderMode && row.dataset.shortySyntheticRow !== 'true';
                 row.classList.remove('dragging-row');
             });
         }
@@ -1202,6 +1243,7 @@ ShortyHTML
             if (!(event.target instanceof Element)) return;
             const row = event.target.closest('tbody tr');
             if (!row) return;
+            if (row.dataset.shortySyntheticRow === 'true') return;
             tableUiState.draggingRow = row;
             row.classList.add('dragging-row');
             if (event.dataTransfer) {
@@ -1221,6 +1263,7 @@ ShortyHTML
             const rect = row.getBoundingClientRect();
             const insertBefore = event.clientY < rect.top + (rect.height / 2);
             tbody.insertBefore(tableUiState.draggingRow, insertBefore ? row : row.nextSibling);
+            ensureSyntheticRow(tbody.closest('table'));
         });
 
         document.addEventListener('drop', function(event) {
@@ -1268,6 +1311,7 @@ ShortyHTML
             }
             const tbody = clonedTable.querySelector('tbody');
             if (tbody) {
+                tbody.querySelectorAll('tr[data-shorty-synthetic-row="true"]').forEach(row => row.remove());
                 const rows = tbody.querySelectorAll('tr');
                 rows.forEach(row => {
                     const cells = row.querySelectorAll('td');
@@ -1369,6 +1413,18 @@ ShortyHTML
                 if (selected && isDataCell(selected)) {
                     setSelectedCell(selected);
                 }
+                const defaultEditor = event.target.closest('tr[data-shorty-synthetic-row="true"] td div[contenteditable="true"]');
+                if (defaultEditor && ['<new row>', '<press save to make a new row>'].includes(defaultEditor.textContent.trim())) {
+                    requestAnimationFrame(() => {
+                        if (!defaultEditor.isConnected) return;
+                        const selection = window.getSelection();
+                        if (!selection) return;
+                        const range = document.createRange();
+                        range.selectNodeContents(defaultEditor);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                    });
+                }
             }
 
             // Copy
@@ -1386,6 +1442,20 @@ ShortyHTML
             // Edit / Save
             if (event.target && (event.target.id === 'edit-button' || event.target.classList.contains('smbtn-edit'))) {
                 const row = event.target.closest('tr');
+                if (row && row.dataset.shortySyntheticRow === 'true') {
+                    row.removeAttribute('data-shorty-synthetic-row');
+                    row.querySelectorAll('td').forEach((cell, index, cells) => {
+                        if (index < cells.length - 1) {
+                            setTextCellEditorMode(cell, false);
+                            cell.classList.remove('shorty-cell-editing');
+                        }
+                    });
+                    event.target.innerText = 'Edit';
+                    ensureSyntheticRow(row.closest('table'));
+                    applyTableStyles();
+                    saveCurrentTableToServer();
+                    return;
+                }
                 if (event.target.innerText.trim() === 'Edit') {
                     setRowEditMode(row, true);
                     event.target.innerText = 'Save';
@@ -1405,6 +1475,22 @@ ShortyHTML
                 row.parentNode.removeChild(row);
                 // persist change
                 saveCurrentTableToServer();
+                return;
+            }
+
+            if (event.target && event.target.classList.contains('smbtn-reset')) {
+                const row = event.target.closest('tr[data-shorty-synthetic-row="true"]');
+                if (!row) return;
+                Array.from(row.querySelectorAll('td')).slice(0, -1).forEach((cell, index) => {
+                    const editor = cell.querySelector('div');
+                    if (editor) {
+                        editor.textContent = index === 0 ? '<new row>' : (index === 1 ? '<press save to make a new row>' : '');
+                    }
+                    cell.dataset.mode = CELL_MODE_TEXT;
+                    cell.removeAttribute(MARKDOWN_SOURCE_B64_ATTR);
+                    cell.removeAttribute(MARKDOWN_SOURCE_LEGACY_ATTR);
+                });
+                applyTableStyles();
                 return;
             }
         });
