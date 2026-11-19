@@ -1430,11 +1430,8 @@ ShortyHTML
             // Copy
             if (event.target && (event.target.id === 'copy-button' || event.target.classList.contains('smbtn-copy'))) {
                 const sourceCell = event.target.closest('td').previousElementSibling;
-                copyCellContentToClipboard(sourceCell).then(function() {
-                    alert('Cell content copied to clipboard');
-                }).catch(function(err) {
+                copyCellContentToClipboard(sourceCell).catch(function(err) {
                     console.error('Could not copy text: ', err);
-                    alert('Copy failed');
                 });
                 return;
             }

@@ -915,13 +915,20 @@ ShortyJSON
             }
 
             if (event.target && (event.target.id === 'copy-button' || event.target.classList.contains('smbtn-copy'))) {
-                const leftCell = event.target.closest('td').previousElementSibling;
-                const leftCellText = leftCell ? leftCell.innerText : '';
-                copyTextToClipboard(leftCellText)
-                    .then(function() { alert('Cell text copied to clipboard'); })
+                const row = event.target.closest('tr');
+                const table = event.target.closest('table');
+                if (!row || !table) return;
+                const headers = Array.from(table.querySelectorAll('thead th'))
+                    .slice(0, -1)
+                    .map(th => th.textContent.trim());
+                const cells = Array.from(row.querySelectorAll('td'));
+                const rowObject = {};
+                headers.forEach((header, index) => {
+                    rowObject[header] = cells[index] ? cells[index].innerText.trim() : '';
+                });
+                copyTextToClipboard(JSON.stringify(rowObject, null, 2))
                     .catch(function(err) {
-                        console.error('Could not copy text: ', err);
-                        alert('Copy failed');
+                        console.error('Could not copy JSON row: ', err);
                     });
                 return;
             }
