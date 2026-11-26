@@ -54,6 +54,7 @@ ShortyHTML
         const FONT_SCALE_STEP = 0.05;
         const MIN_TABLE_FONT_SCALE = 0.70;
         const MAX_TABLE_FONT_SCALE = 1.40;
+        const HTML_DOUBLE_HEIGHT_STORAGE_KEY = 'shorty_html_double_height';
 
         const tableUiState = {
             reorderMode: false,
@@ -125,6 +126,7 @@ ShortyHTML
         function renderTableHtml(tableHtml) {
             const container = getTableContainer();
             if (!container) return;
+            loadTableSettingsFromMarkup(tableHtml);
             container.innerHTML = '';
             if (!tableHtml) {
                 applyTableStyles();
@@ -274,8 +276,63 @@ ShortyHTML
                 return;
             }
             ensureRuntimeActions(table);
-            renderTableHtml(table.outerHTML);
+            const metadataComment = extractShortyMetadataComment(markup);
+            renderTableHtml(table.outerHTML + (metadataComment ? '\n' + metadataComment : ''));
             clearStorageMessage();
+        }
+
+        function extractShortyMetadataComment(markup) {
+            const match = String(markup || '').match(/<!--\s*shorty:\s*\n[\s\S]*?-->/i);
+            return match ? match[0] : '';
+        }
+
+        function loadTableSettingsFromMarkup(markup) {
+            const source = String(markup || '');
+            const metadataComment = extractShortyMetadataComment(source);
+            let fontScale = loadPersistedTableFontScale();
+            let doubleHeight = localStorage.getItem(HTML_DOUBLE_HEIGHT_STORAGE_KEY) === '1';
+            const legacyFont = source.match(/--shorty-table-font-size\s*:\s*([0-9]*\.?[0-9]+)em/i);
+            const legacyDoubleHeight = /rows-double-height/i.test(source);
+            if (legacyFont) fontScale = clampTableFontScale(parseFloat(legacyFont[1]));
+            if (legacyDoubleHeight) doubleHeight = true;
+
+            if (metadataComment) {
+                const savedFont = metadataComment.match(/^\s*font_scale:\s*([0-9]*\.?[0-9]+)\s*$/m);
+                const savedDoubleHeight = metadataComment.match(/^\s*double_height:\s*(true|false)\s*$/mi);
+                if (savedFont) fontScale = clampTableFontScale(parseFloat(savedFont[1]));
+                if (savedDoubleHeight) doubleHeight = savedDoubleHeight[1].toLowerCase() === 'true';
+            }
+
+            tableUiState.fontScale = fontScale;
+            tableUiState.doubleHeight = doubleHeight;
+            localStorage.setItem(HTML_FONT_SCALE_STORAGE_KEY, String(fontScale));
+            localStorage.setItem(HTML_DOUBLE_HEIGHT_STORAGE_KEY, doubleHeight ? '1' : '0');
+        }
+
+        function serializeTableForStorage(table) {
+            const blockTags = new Set(['table', 'thead', 'tbody', 'tfoot', 'tr']);
+            function serialize(element, depth) {
+                const indent = '  '.repeat(depth);
+                const tagName = element.tagName.toLowerCase();
+                const attributes = Array.from(element.attributes).map(attribute =>
+                    ' ' + attribute.name + '="' + attribute.value.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '"'
+                ).join('');
+                const opening = '<' + tagName + attributes + '>';
+                if (!blockTags.has(tagName)) return indent + element.outerHTML;
+                const children = Array.from(element.children);
+                if (!children.length) return indent + opening + '</' + tagName + '>';
+                return indent + opening + '\n'
+                    + children.map(child => serialize(child, depth + 1)).join('\n')
+                    + '\n' + indent + '</' + tagName + '>';
+            }
+            return serialize(table, 0);
+        }
+
+        function serializeTableMetadata() {
+            return '<!--\nshorty:\n'
+                + '  font_scale: ' + tableUiState.fontScale.toFixed(2) + '\n'
+                + '  double_height: ' + (tableUiState.doubleHeight ? 'true' : 'false') + '\n'
+                + '-->';
         }
 
         function sanitizeHtmlFilename(name) {
@@ -702,7 +759,7 @@ ShortyHTML
 
             document.getElementById('toggle-row-height-btn').addEventListener('click', function() {
                 tableUiState.doubleHeight = !tableUiState.doubleHeight;
-                localStorage.setItem('shorty_html_double_height', tableUiState.doubleHeight ? '1' : '0');
+                localStorage.setItem(HTML_DOUBLE_HEIGHT_STORAGE_KEY, tableUiState.doubleHeight ? '1' : '0');
                 applyTableStyles();
             });
 
@@ -1292,8 +1349,9 @@ ShortyHTML
             clonedTable.querySelectorAll('td[data-mode="markdown"]').forEach(cell => {
                 const editor = cell.querySelector('textarea.shorty-md-editor');
                 const source = editor ? editor.value : (getMarkdownSource(cell) || cell.innerText || '');
-                setMarkdownSource(cell, source);
                 cell.textContent = source;
+                cell.removeAttribute(MARKDOWN_SOURCE_B64_ATTR);
+                cell.removeAttribute(MARKDOWN_SOURCE_LEGACY_ATTR);
             });
             // Do not persist UI-only selection/edit classes.
             clonedTable.querySelectorAll('td').forEach(cell => {
@@ -1318,9 +1376,14 @@ ShortyHTML
                     if (cells.length > 0) row.removeChild(cells[cells.length - 1]);
                 });
             }
-            // remove any inline style attributes so saved file remains unstyled
+            // Keep saved markup readable and free of display-only attributes.
+            clonedTable.removeAttribute('style');
             clonedTable.querySelectorAll('[style]').forEach(el => el.removeAttribute('style'));
-            const updatedHtml = clonedTable.outerHTML;
+            clonedTable.className = 'ShortyTable';
+            clonedTable.querySelectorAll('[class]').forEach(el => el.removeAttribute('class'));
+            clonedTable.querySelectorAll('td[data-mode="text"]').forEach(cell => cell.removeAttribute('data-mode'));
+            const updatedHtml = serializeTableForStorage(clonedTable)
+                + '\n\n' + serializeTableMetadata() + '\n';
             const selectedOption = document.getElementById('tableSelect');
             const filePathValue = (
                 selectedOption &&
@@ -1505,8 +1568,12 @@ ShortyHTML
             insertEditableLineBreak();
         });
 
-        // apply styles initially
-        document.addEventListener('DOMContentLoaded', function(){ applyTableStyles(); });
+        // Restore saved display settings, then apply the app's CSS.
+        document.addEventListener('DOMContentLoaded', function(){
+            const container = getTableContainer();
+            if (container) loadTableSettingsFromMarkup(container.innerHTML);
+            applyTableStyles();
+        });
 
         function copyCellContentToClipboard(cell) {
             if (!cell) return Promise.reject(new Error('No cell to copy'));

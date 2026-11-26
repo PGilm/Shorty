@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import os
 import subprocess
 import sys
+from html import escape as html_escape
 from bs4 import BeautifulSoup
 from streamlit import html
 
@@ -62,6 +63,50 @@ def _current_username():
 
 def _basename_or_empty(path_value):
     return os.path.basename(str(path_value or "").strip())
+
+
+def _shorty_metadata_comment(html_content):
+    match = re.search(r"<!--\s*shorty:\s*\n.*?-->", html_content or "", re.DOTALL)
+    return match.group(0) if match else ""
+
+
+def _format_shorty_table(table):
+    """Format table structure without changing text inside its cells."""
+    block_tags = {"table", "thead", "tbody", "tfoot", "tr"}
+
+    def opening_tag(tag):
+        attrs = []
+        for name, value in tag.attrs.items():
+            if value is None:
+                attrs.append(f" {name}")
+                continue
+            if isinstance(value, list):
+                value = " ".join(str(item) for item in value)
+            attrs.append(f' {name}="{html_escape(str(value), quote=True)}"')
+        return f"<{tag.name}{''.join(attrs)}>"
+
+    def render(tag, depth=0):
+        indent = "  " * depth
+        start = opening_tag(tag)
+        if tag.name not in block_tags:
+            return f"{indent}{start}{tag.decode_contents(formatter='minimal')}</{tag.name}>"
+
+        children = [
+            child for child in tag.children
+            if getattr(child, "name", None) or str(child).strip()
+        ]
+        if not children:
+            return f"{indent}{start}</{tag.name}>"
+        rendered_children = []
+        for child in children:
+            if getattr(child, "name", None):
+                rendered_children.append(render(child, depth + 1))
+            else:
+                rendered_children.append("  " * (depth + 1) + str(child))
+        body = "\n".join(rendered_children)
+        return f"{indent}{start}\n{body}\n{indent}</{tag.name}>"
+
+    return render(table)
 
 
 def _folder_with_filename(username, requested_name, fallback_name):
@@ -438,7 +483,10 @@ def shortytable(table_html=None):
                         delete_button.string = 'Delete'
                         new_cell.append(delete_button)
                         row.append(new_cell)
+                    metadata_comment = _shorty_metadata_comment(html_content)
                     session["table_html"] = str(table)
+                    if metadata_comment:
+                        session["table_html"] += "\n" + metadata_comment
                     session["filenamehtml"] = path
                     #return render_template(
                         # 'core/ShortyHTML.html', 
@@ -654,18 +702,18 @@ def save_html():
             if len(cells) > 2:
                 cells[-1].decompose()  # remove last cell
 
-        # Strip style, id, and event attributes. Keep only the element classes
-        # and a minimal allowlist needed for editing/display (data-field and
-        # markdown cell metadata).
-        for tag in table.find_all(True):
+        # Keep the table's identity and ShortyTable styling class. Cell mode is
+        # text by default, so only Markdown cells need an inline mode marker.
+        for tag in [table, *table.find_all(True)]:
             keep_attrs = {}
-            if 'class' in tag.attrs:
-                keep_attrs['class'] = tag.attrs.get('class')
+            if tag is table:
+                if tag.attrs.get('id'):
+                    keep_attrs['id'] = tag.attrs.get('id')
+                keep_attrs['class'] = ['ShortyTable']
             if tag.name == 'td':
                 mode = tag.attrs.get('data-mode')
-                if mode in ('text', 'markdown'):
-                    keep_attrs['data-mode'] = mode
                 if mode == 'markdown':
+                    keep_attrs['data-mode'] = 'markdown'
                     if 'data-md-source-b64' in tag.attrs:
                         keep_attrs['data-md-source-b64'] = tag.attrs.get('data-md-source-b64')
                     elif 'data-md-source' in tag.attrs:
@@ -675,8 +723,14 @@ def save_html():
                 keep_attrs['data-field'] = tag.attrs.get('data-field')
             tag.attrs = keep_attrs
 
-        # Write cleaned HTML back to file
-        atomic_write_text(path, str(table), encoding='utf-8')
+        metadata_comment = _shorty_metadata_comment(html_content)
+        saved_html = _format_shorty_table(table)
+        if metadata_comment:
+            saved_html += "\n\n" + metadata_comment
+
+        # Store readable markup and keep per-table display settings in the
+        # trailing YAML comment, outside of the table contents.
+        atomic_write_text(path, saved_html + "\n", encoding='utf-8')
 
         # For the response we want to include the runtime Actions column
         display_soup = BeautifulSoup(str(table), 'html.parser')
@@ -698,6 +752,8 @@ def save_html():
             row.append(new_cell)
 
         session["table_html"] = str(display_soup.find('table'))
+        if metadata_comment:
+            session["table_html"] += "\n" + metadata_comment
 
         return jsonify({'message': 'HTML file saved successfully', 'table_html': session["table_html"]})
 
